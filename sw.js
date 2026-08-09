@@ -30,7 +30,8 @@ self.addEventListener('activate', (event) => {
 // this service worker's scope would intercept.
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) {
+  const url = new URL(req.url);
+  if (req.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/proxy/')) {
     return;
   }
   event.respondWith(

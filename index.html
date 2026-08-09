@@ -184,13 +184,24 @@ function saveConnSettings() {
   localStorage.setItem('connSettings', JSON.stringify(settings));
 }
 
+function ipVal() { return document.getElementById('ip').value.trim(); }
+function portVal() { return document.getElementById('port').value.trim(); }
+
 function base() {
-  const ip = document.getElementById('ip').value.trim();
-  const port = document.getElementById('port').value.trim();
-  return 'http://' + ip + ':' + port;
+  return 'http://' + ipVal() + ':' + portVal();
 }
 function pw() {
   return encodeURIComponent(document.getElementById('password').value);
+}
+
+// Used only by the live-state reads (refreshState). Routes through this
+// page's own origin's /proxy/ route (see server.py) instead of straight to
+// the device, so the browser treats it as a same-origin request -- immune
+// to both mixed-content and CORS restrictions. Only works when this page is
+// actually being served by server.py; falls back to a clear error otherwise.
+function proxyPath(path) {
+  const sep = path.includes('?') ? '&' : '?';
+  return `/proxy${path}${sep}_ip=${encodeURIComponent(ipVal())}&_port=${encodeURIComponent(portVal())}`;
 }
 
 const DEFAULT_ZONE_NAMES = { 1: 'MAIN BEDROOM', 2: 'TK BEDROOM', 3: 'SPARE BEDROO' };
@@ -382,11 +393,11 @@ async function fetchWithTimeout(url, ms) {
 
 function describeFetchError(err) {
   if (!err) return 'unknown error';
-  if (err.name === 'AbortError') return 'timed out — unreachable from here (are you on the home WiFi?)';
-  if (location.protocol === 'https:') {
-    return `blocked by the browser (this page is HTTPS, the unit is HTTP — mixed content) and/or the unit doesn't allow cross-origin requests (CORS). Raw error: "${err.message}". To actually test this, open the app from a non-HTTPS address (the local file, or a plain-http server on your LAN) instead of this hosted link.`;
+  if (err.name === 'AbortError') return 'timed out — the proxy or the unit is unreachable (is server.py running, and are you on the home WiFi?)';
+  if (err.message && err.message.startsWith('HTTP 404')) {
+    return `no /proxy route found at ${location.origin} — this page needs to be served by server.py for live state reading to work (it isn't a plain static host). See the README for how to run it.`;
   }
-  return `request failed — most likely the unit doesn't send CORS headers for browser requests. Raw error: "${err.message}"`;
+  return `request failed: "${err.message}". If this page isn't currently open via server.py (e.g. you're on the GitHub Pages link or opened the raw file), that's expected — live reads only work when server.py is serving this page.`;
 }
 
 let pollTimer = null;
@@ -405,13 +416,12 @@ function setValueUnlessFocused(el, value) {
 // unit is actually doing. Runs once on load, once whenever you return to this
 // tab, and repeatedly if the "keep auto-refreshing" toggle is on.
 async function refreshState() {
-  const b = base();
   const n = parseInt(document.getElementById('zones').value, 10) || 0;
   let okCount = 0;
   let lastError = null;
 
   try {
-    const sysXml = await fetchWithTimeout(`${b}/getSystemData`, 6000);
+    const sysXml = await fetchWithTimeout(proxyPath('/getSystemData'), 6000);
     const onOff = parseXmlTag(sysXml, 'airconOnOff');
     const mode = parseXmlTag(sysXml, 'mode');
     const fanSpeed = parseXmlTag(sysXml, 'fanSpeed');
@@ -438,7 +448,7 @@ async function refreshState() {
 
   for (let z = 1; z <= n; z++) {
     try {
-      const xml = await fetchWithTimeout(`${b}/getZoneData?zone=${z}`, 6000);
+      const xml = await fetchWithTimeout(proxyPath(`/getZoneData?zone=${z}`), 6000);
       const setting = parseXmlTag(xml, 'setting');
       const percent = parseXmlTag(xml, 'userPercentSetting');
       const desiredTemp = parseXmlTag(xml, 'desiredTemp');
