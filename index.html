@@ -147,6 +147,15 @@
 
 <fieldset>
   <legend>Zones</legend>
+  <div class="row" style="align-items:center;">
+    <label style="display:flex; align-items:center; gap:8px; margin-top:0; flex:1; font-size:13px; color:#ccc;">
+      <input type="checkbox" id="live-poll-toggle" style="width:auto; margin:0;">
+      Auto-refresh room temps while this page is open
+    </label>
+  </div>
+  <small class="note" id="live-poll-status">
+    Off. When enabled, polls the unit every 15s for live readings instead of manual paste.
+  </small>
   <div id="zone-container"></div>
   <small class="note">Zone temp always re-sends the zone's on/off setting alongside desiredTemp — set the toggle below before adjusting temp.</small>
 </fieldset>
@@ -315,12 +324,7 @@ document.addEventListener('input', (e) => {
   const tempZ = e.target.getAttribute && e.target.getAttribute('data-zone-actualtemp-input');
   if (tempZ) {
     saveZoneTemp(tempZ, e.target.value.trim());
-    const temps = loadZoneTemps();
-    const t = temps[tempZ];
-    const badge = document.querySelector(`[data-zone-title-temp="${tempZ}"]`);
-    const asof = document.querySelector(`[data-zone-temp-asof="${tempZ}"]`);
-    if (badge) badge.textContent = t ? ' · ' + t.value + '°C' : '';
-    if (asof) asof.textContent = t ? 'as of last manual check (' + t.at + ')' : 'no reading recorded yet';
+    updateZoneTempUI(tempZ, e.target.value.trim(), 'manual');
   }
   if (CONN_KEYS.includes(e.target.id)) saveConnSettings();
   updateLinks();
@@ -329,6 +333,131 @@ document.getElementById('zones').addEventListener('change', renderZones);
 
 loadConnSettings();
 renderZones();
+
+// ---- shared zone-temp display update (used by both manual paste and live poll) ----
+function updateZoneTempUI(z, value, source) {
+  const badge = document.querySelector(`[data-zone-title-temp="${z}"]`);
+  const asof = document.querySelector(`[data-zone-temp-asof="${z}"]`);
+  const input = document.querySelector(`[data-zone-actualtemp-input="${z}"]`);
+  if (badge) badge.textContent = value ? ' · ' + value + '°C' : '';
+  if (asof) {
+    if (!value) asof.textContent = 'no reading recorded yet';
+    else if (source === 'live') asof.textContent = 'live (updated ' + new Date().toLocaleTimeString() + ')';
+    else asof.textContent = 'as of last manual check';
+  }
+  if (input && source === 'live' && document.activeElement !== input) input.value = value;
+}
+
+// ---- live polling: fetch getSystemData + each zone's getZoneData directly ----
+// Only has a real chance of working when this page is NOT served over HTTPS
+// (mixed content blocks an HTTPS page from fetching an HTTP address, unconditionally)
+// and only if the unit's web server happens to allow cross-origin reads (CORS) —
+// most small embedded HTTP servers don't send those headers, so this may still fail
+// even outside HTTPS. The status line below reports exactly what happened either way.
+function parseXmlTag(xmlText, tag) {
+  const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+  if (doc.querySelector('parsererror')) return null;
+  const el = doc.querySelector(tag);
+  return el ? el.textContent : null;
+}
+
+async function fetchWithTimeout(url, ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    const res = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.text();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function describeFetchError(err) {
+  if (!err) return 'unknown error';
+  if (err.name === 'AbortError') return 'timed out — unreachable from here (are you on the home WiFi?)';
+  if (location.protocol === 'https:') {
+    return `blocked by the browser (this page is HTTPS, the unit is HTTP — mixed content) and/or the unit doesn't allow cross-origin requests (CORS). Raw error: "${err.message}". To actually test this, open the app from a non-HTTPS address (the local file, or a plain-http server on your LAN) instead of this hosted link.`;
+  }
+  return `request failed — most likely the unit doesn't send CORS headers for browser requests. Raw error: "${err.message}"`;
+}
+
+let pollTimer = null;
+
+async function pollOnce() {
+  const statusEl = document.getElementById('live-poll-status');
+  const b = base();
+  const n = parseInt(document.getElementById('zones').value, 10) || 0;
+  let okCount = 0;
+  let lastError = null;
+  let systemNote = '';
+
+  try {
+    const sysXml = await fetchWithTimeout(`${b}/getSystemData`, 6000);
+    const onOff = parseXmlTag(sysXml, 'airconOnOff');
+    systemNote = onOff === '1' ? 'Unit is ON.' : onOff === '0' ? 'Unit is OFF.' : '';
+    okCount++;
+  } catch (err) {
+    lastError = err;
+  }
+
+  for (let z = 1; z <= n; z++) {
+    try {
+      const xml = await fetchWithTimeout(`${b}/getZoneData?zone=${z}`, 6000);
+      const temp = parseXmlTag(xml, 'actualTemp');
+      if (temp !== null) {
+        saveZoneTemp(z, temp);
+        updateZoneTempUI(z, temp, 'live');
+        okCount++;
+      }
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  const time = new Date().toLocaleTimeString();
+  const statusEl2 = document.getElementById('live-poll-status');
+  if (okCount > 0 && !lastError) {
+    statusEl2.textContent = `Live — last updated ${time}. ${systemNote}`;
+  } else if (okCount > 0 && lastError) {
+    statusEl2.textContent = `Partially live (some requests failed) — last updated ${time}. ${systemNote}`;
+  } else {
+    statusEl2.textContent = `Every request failed as of ${time}: ${describeFetchError(lastError)}`;
+  }
+}
+
+function startPolling() {
+  stopPolling();
+  document.getElementById('live-poll-status').textContent = 'Starting…';
+  pollOnce();
+  pollTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') pollOnce();
+  }, 15000);
+}
+function stopPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = null;
+}
+
+document.getElementById('live-poll-toggle').addEventListener('change', (e) => {
+  localStorage.setItem('livePollEnabled', e.target.checked ? '1' : '0');
+  if (e.target.checked) {
+    startPolling();
+  } else {
+    stopPolling();
+    document.getElementById('live-poll-status').textContent =
+      'Off. When enabled, polls the unit every 15s for live readings instead of manual paste.';
+  }
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && document.getElementById('live-poll-toggle').checked) {
+    pollOnce();
+  }
+});
+if (localStorage.getItem('livePollEnabled') === '1') {
+  document.getElementById('live-poll-toggle').checked = true;
+  startPolling();
+}
 
 // ---- PWA install hint (manual add-to-home-screen; no auto prompt possible on iOS) ----
 (function () {
