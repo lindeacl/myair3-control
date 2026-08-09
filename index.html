@@ -72,6 +72,12 @@
   .zone:first-child { border-top: none; margin-top: 0; padding-top: 0; }
   .zone-title { font-size: 13px; color: #ccc; margin-bottom: 4px; }
   .zone-temp-badge { color: #6fa8ff; font-weight: 600; }
+  a.btn.active {
+    outline: 2px solid #fff;
+    outline-offset: -2px;
+    box-shadow: 0 0 0 2px #ffffff33;
+  }
+  a.btn.active::after { content: " ✓"; }
   small.note { color: #777; display: block; margin-top: 4px; }
   #install-banner {
     display: none;
@@ -143,6 +149,7 @@
     <input id="centralTemp" type="number" step="0.5" value="22" style="flex:1">
     <a class="btn secondary" id="link-temp" href="#" target="_blank" rel="noopener">Set Temp</a>
   </div>
+  <small class="note" id="central-state-note">Not read yet — will refresh automatically.</small>
 </fieldset>
 
 <fieldset>
@@ -150,11 +157,11 @@
   <div class="row" style="align-items:center;">
     <label style="display:flex; align-items:center; gap:8px; margin-top:0; flex:1; font-size:13px; color:#ccc;">
       <input type="checkbox" id="live-poll-toggle" style="width:auto; margin:0;">
-      Auto-refresh room temps while this page is open
+      Keep auto-refreshing every 15s (otherwise refreshes once on open / on return to this tab)
     </label>
   </div>
   <small class="note" id="live-poll-status">
-    Off. When enabled, polls the unit every 15s for live readings instead of manual paste.
+    Reading current state…
   </small>
   <div id="zone-container"></div>
   <small class="note">Zone temp always re-sends the zone's on/off setting alongside desiredTemp — set the toggle below before adjusting temp.</small>
@@ -384,18 +391,46 @@ function describeFetchError(err) {
 
 let pollTimer = null;
 
-async function pollOnce() {
-  const statusEl = document.getElementById('live-poll-status');
+function setActive(id, isActive) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('active', isActive);
+}
+function setValueUnlessFocused(el, value) {
+  if (el && value !== null && document.activeElement !== el) el.value = value;
+}
+
+// Reads getSystemData + every zone's getZoneData and reflects the real device
+// state onto the controls (which button is active, current fan/temp/damper
+// values) instead of leaving buttons looking the same regardless of what the
+// unit is actually doing. Runs once on load, once whenever you return to this
+// tab, and repeatedly if the "keep auto-refreshing" toggle is on.
+async function refreshState() {
   const b = base();
   const n = parseInt(document.getElementById('zones').value, 10) || 0;
   let okCount = 0;
   let lastError = null;
-  let systemNote = '';
 
   try {
     const sysXml = await fetchWithTimeout(`${b}/getSystemData`, 6000);
     const onOff = parseXmlTag(sysXml, 'airconOnOff');
-    systemNote = onOff === '1' ? 'Unit is ON.' : onOff === '0' ? 'Unit is OFF.' : '';
+    const mode = parseXmlTag(sysXml, 'mode');
+    const fanSpeed = parseXmlTag(sysXml, 'fanSpeed');
+    const centralDesiredTemp = parseXmlTag(sysXml, 'centralDesiredTemp');
+    const centralActualTemp = parseXmlTag(sysXml, 'centralActualTemp');
+
+    setActive('link-on', onOff === '1');
+    setActive('link-off', onOff === '0');
+    setActive('link-mode-1', mode === '1');
+    setActive('link-mode-2', mode === '2');
+    setActive('link-mode-3', mode === '3');
+    setValueUnlessFocused(document.getElementById('fanSpeed'), fanSpeed);
+    setValueUnlessFocused(document.getElementById('centralTemp'), centralDesiredTemp);
+
+    const note = document.getElementById('central-state-note');
+    if (note) {
+      const onOffLabel = onOff === '1' ? 'ON' : onOff === '0' ? 'OFF' : '?';
+      note.textContent = `Unit is ${onOffLabel}. Actual temp: ${centralActualTemp ?? '?'}°C.`;
+    }
     okCount++;
   } catch (err) {
     lastError = err;
@@ -404,34 +439,46 @@ async function pollOnce() {
   for (let z = 1; z <= n; z++) {
     try {
       const xml = await fetchWithTimeout(`${b}/getZoneData?zone=${z}`, 6000);
-      const temp = parseXmlTag(xml, 'actualTemp');
-      if (temp !== null) {
-        saveZoneTemp(z, temp);
-        updateZoneTempUI(z, temp, 'live');
-        okCount++;
+      const setting = parseXmlTag(xml, 'setting');
+      const percent = parseXmlTag(xml, 'userPercentSetting');
+      const desiredTemp = parseXmlTag(xml, 'desiredTemp');
+      const actualTemp = parseXmlTag(xml, 'actualTemp');
+
+      const onBtn = document.querySelector(`[data-zone-on="${z}"]`);
+      const offBtn = document.querySelector(`[data-zone-off="${z}"]`);
+      if (onBtn) onBtn.classList.toggle('active', setting === '1');
+      if (offBtn) offBtn.classList.toggle('active', setting === '0');
+
+      const settingSelect = document.querySelector(`[data-zone-setting="${z}"]`);
+      if (settingSelect && document.activeElement !== settingSelect && setting !== null) settingSelect.value = setting;
+      setValueUnlessFocused(document.querySelector(`[data-zone-percent-input="${z}"]`), percent);
+      setValueUnlessFocused(document.querySelector(`[data-zone-temp-input="${z}"]`), desiredTemp);
+
+      if (actualTemp !== null) {
+        saveZoneTemp(z, actualTemp);
+        updateZoneTempUI(z, actualTemp, 'live');
       }
+      okCount++;
     } catch (err) {
       lastError = err;
     }
   }
 
   const time = new Date().toLocaleTimeString();
-  const statusEl2 = document.getElementById('live-poll-status');
+  const statusEl = document.getElementById('live-poll-status');
   if (okCount > 0 && !lastError) {
-    statusEl2.textContent = `Live — last updated ${time}. ${systemNote}`;
+    statusEl.textContent = `Reflecting live state — last updated ${time}.`;
   } else if (okCount > 0 && lastError) {
-    statusEl2.textContent = `Partially live (some requests failed) — last updated ${time}. ${systemNote}`;
+    statusEl.textContent = `Partially reflecting live state (some requests failed) — last updated ${time}.`;
   } else {
-    statusEl2.textContent = `Every request failed as of ${time}: ${describeFetchError(lastError)}`;
+    statusEl.textContent = `Couldn't read current state as of ${time}: ${describeFetchError(lastError)}`;
   }
 }
 
 function startPolling() {
   stopPolling();
-  document.getElementById('live-poll-status').textContent = 'Starting…';
-  pollOnce();
   pollTimer = setInterval(() => {
-    if (document.visibilityState === 'visible') pollOnce();
+    if (document.visibilityState === 'visible') refreshState();
   }, 15000);
 }
 function stopPolling() {
@@ -442,22 +489,21 @@ function stopPolling() {
 document.getElementById('live-poll-toggle').addEventListener('change', (e) => {
   localStorage.setItem('livePollEnabled', e.target.checked ? '1' : '0');
   if (e.target.checked) {
+    refreshState();
     startPolling();
   } else {
     stopPolling();
-    document.getElementById('live-poll-status').textContent =
-      'Off. When enabled, polls the unit every 15s for live readings instead of manual paste.';
   }
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && document.getElementById('live-poll-toggle').checked) {
-    pollOnce();
-  }
+  if (document.visibilityState === 'visible') refreshState();
 });
 if (localStorage.getItem('livePollEnabled') === '1') {
   document.getElementById('live-poll-toggle').checked = true;
   startPolling();
 }
+// always attempt one read on startup, regardless of the auto-refresh toggle
+refreshState();
 
 // ---- PWA install hint (manual add-to-home-screen; no auto prompt possible on iOS) ----
 (function () {
