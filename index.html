@@ -71,6 +71,7 @@
   .zone { border-top: 1px solid #2a2a2a; padding-top: 10px; margin-top: 10px; }
   .zone:first-child { border-top: none; margin-top: 0; padding-top: 0; }
   .zone-title { font-size: 13px; color: #ccc; margin-bottom: 4px; }
+  .zone-temp-badge { color: #6fa8ff; font-weight: 600; }
   small.note { color: #777; display: block; margin-top: 4px; }
   #install-banner {
     display: none;
@@ -191,23 +192,47 @@ function saveZoneName(z, name) {
   localStorage.setItem('zoneNames', JSON.stringify(names));
 }
 
+function loadZoneTemps() {
+  try {
+    return JSON.parse(localStorage.getItem('zoneTemps') || '{}');
+  } catch (e) {
+    return {};
+  }
+}
+function saveZoneTemp(z, value) {
+  const temps = loadZoneTemps();
+  if (value) {
+    temps[z] = { value: value, at: new Date().toLocaleString() };
+  } else {
+    delete temps[z];
+  }
+  localStorage.setItem('zoneTemps', JSON.stringify(temps));
+}
+
 function renderZones() {
   const n = parseInt(document.getElementById('zones').value, 10) || 0;
   const container = document.getElementById('zone-container');
   container.innerHTML = '';
   const names = loadZoneNames();
+  const temps = loadZoneTemps();
   for (let z = 1; z <= n; z++) {
     const div = document.createElement('div');
     div.className = 'zone';
     const zoneName = names[z] || '';
+    const temp = temps[z] || {};
     div.innerHTML = `
-      <div class="zone-title">Zone ${z}<span data-zone-title-name="${z}">${zoneName ? ' — ' + zoneName : ''}</span></div>
+      <div class="zone-title">Zone ${z}<span data-zone-title-name="${z}">${zoneName ? ' — ' + zoneName : ''}</span><span class="zone-temp-badge" data-zone-title-temp="${z}">${temp.value ? ' · ' + temp.value + '°C' : ''}</span></div>
+      <small class="note" data-zone-temp-asof="${z}">${temp.value ? 'as of last manual check' + (temp.at ? ' (' + temp.at + ')' : '') : 'no reading recorded yet'}</small>
       <label>Zone name (from &lt;name&gt; in Get Zone Data response)</label>
       <div class="row">
         <input type="text" value="${zoneName}" placeholder="e.g. SPARE BEDROO" data-zone-name-input="${z}" style="flex:1">
       </div>
       <div class="row">
         <a class="btn data" data-zone-data="${z}" href="#" target="_blank" rel="noopener">Get Zone Data</a>
+      </div>
+      <label>Current temp &mdash; paste &lt;actualTemp&gt; from the Get Zone Data response above (0.0 usually means this zone has no working sensor)</label>
+      <div class="row">
+        <input type="text" inputmode="decimal" value="${temp.value || ''}" placeholder="e.g. 21.5" data-zone-actualtemp-input="${z}" style="flex:1">
       </div>
       <div class="row">
         <a class="btn" data-zone-on="${z}" href="#" target="_blank" rel="noopener">On</a>
@@ -286,6 +311,16 @@ document.addEventListener('input', (e) => {
     saveZoneName(nameZ, e.target.value);
     const titleSpan = document.querySelector(`[data-zone-title-name="${nameZ}"]`);
     if (titleSpan) titleSpan.textContent = e.target.value ? ' — ' + e.target.value : '';
+  }
+  const tempZ = e.target.getAttribute && e.target.getAttribute('data-zone-actualtemp-input');
+  if (tempZ) {
+    saveZoneTemp(tempZ, e.target.value.trim());
+    const temps = loadZoneTemps();
+    const t = temps[tempZ];
+    const badge = document.querySelector(`[data-zone-title-temp="${tempZ}"]`);
+    const asof = document.querySelector(`[data-zone-temp-asof="${tempZ}"]`);
+    if (badge) badge.textContent = t ? ' · ' + t.value + '°C' : '';
+    if (asof) asof.textContent = t ? 'as of last manual check (' + t.at + ')' : 'no reading recorded yet';
   }
   if (CONN_KEYS.includes(e.target.id)) saveConnSettings();
   updateLinks();
