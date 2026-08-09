@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>MyAir3 Control</title>
+
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#111111">
+
+<!-- Android / Chrome -->
+<meta name="mobile-web-app-capable" content="yes">
+
+<!-- iOS Safari home-screen behavior (iOS ignores parts of the manifest for this) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MyAir3">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 16px;
+    padding-top: calc(16px + env(safe-area-inset-top));
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    background: #111;
+    color: #eee;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #888; font-size: 13px; margin-bottom: 20px; }
+  fieldset {
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 12px 14px 16px;
+    margin-bottom: 16px;
+  }
+  legend { padding: 0 6px; font-weight: 600; font-size: 14px; color: #ccc; }
+  label { display: block; font-size: 12px; color: #999; margin-top: 8px; }
+  input, select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px;
+    margin-top: 2px;
+    border-radius: 6px;
+    border: 1px solid #444;
+    background: #1c1c1c;
+    color: #eee;
+    font-size: 14px;
+  }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  a.btn {
+    flex: 1 1 auto;
+    min-width: 90px;
+    text-align: center;
+    display: block;
+    padding: 12px 8px;
+    border-radius: 8px;
+    background: #2a5adf;
+    color: #fff;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  a.btn.secondary { background: #333; }
+  a.btn.off { background: #802a2a; }
+  a.btn.data { background: #444; font-weight: 400; }
+  .zone { border-top: 1px solid #2a2a2a; padding-top: 10px; margin-top: 10px; }
+  .zone:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+  .zone-title { font-size: 13px; color: #ccc; margin-bottom: 4px; }
+  small.note { color: #777; display: block; margin-top: 4px; }
+  #install-banner {
+    display: none;
+    background: #1c1c1c;
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #ccc;
+    margin-bottom: 16px;
+  }
+  #install-banner button {
+    background: none;
+    border: none;
+    color: #777;
+    float: right;
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<div id="install-banner">
+  <button id="install-dismiss" aria-label="Dismiss">✕</button>
+  <span id="install-text"></span>
+</div>
+
+<h1>MyAir3 Local Control</h1>
+<div class="sub">Tap a button to open the command URL in a new tab. Check the XML that comes back to confirm the change took effect.</div>
+
+<fieldset>
+  <legend>Connection</legend>
+  <label for="ip">Controller IP</label>
+  <input id="ip" value="192.168.1.192">
+  <label for="port">Port</label>
+  <input id="port" value="2025">
+  <label for="password">Password</label>
+  <input id="password" value="password">
+  <label for="zones">Number of zones</label>
+  <input id="zones" type="number" min="1" max="16" value="3">
+  <div class="row">
+    <a class="btn data" id="link-status" href="#" target="_blank" rel="noopener">Get System Data</a>
+    <a class="btn data" id="link-login" href="#" target="_blank" rel="noopener">Login</a>
+  </div>
+</fieldset>
+
+<fieldset>
+  <legend>System</legend>
+  <div class="row">
+    <a class="btn" id="link-on" href="#" target="_blank" rel="noopener">Power On</a>
+    <a class="btn off" id="link-off" href="#" target="_blank" rel="noopener">Power Off</a>
+  </div>
+  <div class="row">
+    <a class="btn secondary" id="link-mode-1" href="#" target="_blank" rel="noopener">Mode: Cool</a>
+    <a class="btn secondary" id="link-mode-2" href="#" target="_blank" rel="noopener">Mode: Heat</a>
+    <a class="btn secondary" id="link-mode-3" href="#" target="_blank" rel="noopener">Mode: Fan</a>
+  </div>
+  <label for="fanSpeed">Fan speed</label>
+  <div class="row">
+    <input id="fanSpeed" type="number" min="1" max="4" value="2" style="flex:1">
+    <a class="btn secondary" id="link-fan" href="#" target="_blank" rel="noopener">Set Fan Speed</a>
+  </div>
+  <div class="row">
+    <a class="btn secondary" id="link-fan-auto" href="#" target="_blank" rel="noopener">Fan: Auto</a>
+  </div>
+  <small class="note">Unconfirmed which value this unit expects for auto &mdash; this button tries <code>fanSpeed=auto</code>. If the response XML doesn't show auto engaged, check the raw XML for a hint (e.g. a numeric code) and tell me &mdash; I'll switch the button to send that value instead.</small>
+  <label for="centralTemp">Central desired temp (°C)</label>
+  <div class="row">
+    <input id="centralTemp" type="number" step="0.5" value="22" style="flex:1">
+    <a class="btn secondary" id="link-temp" href="#" target="_blank" rel="noopener">Set Temp</a>
+  </div>
+</fieldset>
+
+<fieldset>
+  <legend>Zones</legend>
+  <div id="zone-container"></div>
+  <small class="note">Zone temp always re-sends the zone's on/off setting alongside desiredTemp — set the toggle below before adjusting temp.</small>
+</fieldset>
+
+<script>
+// ---- connection settings persistence ----
+const CONN_KEYS = ['ip', 'port', 'password', 'zones'];
+function loadConnSettings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('connSettings') || '{}');
+    CONN_KEYS.forEach(k => {
+      if (saved[k] !== undefined) document.getElementById(k).value = saved[k];
+    });
+  } catch (e) {}
+}
+function saveConnSettings() {
+  const settings = {};
+  CONN_KEYS.forEach(k => { settings[k] = document.getElementById(k).value; });
+  localStorage.setItem('connSettings', JSON.stringify(settings));
+}
+
+function base() {
+  const ip = document.getElementById('ip').value.trim();
+  const port = document.getElementById('port').value.trim();
+  return 'http://' + ip + ':' + port;
+}
+function pw() {
+  return encodeURIComponent(document.getElementById('password').value);
+}
+
+const DEFAULT_ZONE_NAMES = { 1: 'MAIN BEDROOM', 2: 'TK BEDROOM', 3: 'SPARE BEDROO' };
+
+function loadZoneNames() {
+  try {
+    return Object.assign({}, DEFAULT_ZONE_NAMES, JSON.parse(localStorage.getItem('zoneNames') || '{}'));
+  } catch (e) {
+    return Object.assign({}, DEFAULT_ZONE_NAMES);
+  }
+}
+function saveZoneName(z, name) {
+  const names = loadZoneNames();
+  names[z] = name;
+  localStorage.setItem('zoneNames', JSON.stringify(names));
+}
+
+function renderZones() {
+  const n = parseInt(document.getElementById('zones').value, 10) || 0;
+  const container = document.getElementById('zone-container');
+  container.innerHTML = '';
+  const names = loadZoneNames();
+  for (let z = 1; z <= n; z++) {
+    const div = document.createElement('div');
+    div.className = 'zone';
+    const zoneName = names[z] || '';
+    div.innerHTML = `
+      <div class="zone-title">Zone ${z}<span data-zone-title-name="${z}">${zoneName ? ' — ' + zoneName : ''}</span></div>
+      <label>Zone name (from &lt;name&gt; in Get Zone Data response)</label>
+      <div class="row">
+        <input type="text" value="${zoneName}" placeholder="e.g. SPARE BEDROO" data-zone-name-input="${z}" style="flex:1">
+      </div>
+      <div class="row">
+        <a class="btn data" data-zone-data="${z}" href="#" target="_blank" rel="noopener">Get Zone Data</a>
+      </div>
+      <div class="row">
+        <a class="btn" data-zone-on="${z}" href="#" target="_blank" rel="noopener">On</a>
+        <a class="btn off" data-zone-off="${z}" href="#" target="_blank" rel="noopener">Off</a>
+      </div>
+      <label>Desired temp (°C)</label>
+      <div class="row">
+        <input type="number" step="0.5" value="22" data-zone-temp-input="${z}" style="flex:1">
+        <select data-zone-setting="${z}" style="flex:0 0 90px">
+          <option value="1">on</option>
+          <option value="0">off</option>
+        </select>
+        <a class="btn secondary" data-zone-temp-link="${z}" href="#" target="_blank" rel="noopener">Set</a>
+      </div>
+      <label>Damper open % (for zones without a temp sensor &mdash; check hasClimateControl=0 / userPercentAvail=1 in Get Zone Data)</label>
+      <div class="row">
+        <input type="number" min="0" max="100" step="5" value="80" data-zone-percent-input="${z}" style="flex:1">
+        <a class="btn secondary" data-zone-percent-link="${z}" href="#" target="_blank" rel="noopener">Set Damper %</a>
+      </div>
+    `;
+    container.appendChild(div);
+  }
+  updateLinks();
+}
+
+function updateLinks() {
+  const b = base();
+  const p = pw();
+
+  document.getElementById('link-status').href = `${b}/getSystemData`;
+  document.getElementById('link-login').href = `${b}/login?password=${p}`;
+
+  document.getElementById('link-on').href = `${b}/setSystemData?airconOnOff=1`;
+  document.getElementById('link-off').href = `${b}/setSystemData?airconOnOff=0`;
+
+  document.getElementById('link-mode-1').href = `${b}/setSystemData?mode=1`;
+  document.getElementById('link-mode-2').href = `${b}/setSystemData?mode=2`;
+  document.getElementById('link-mode-3').href = `${b}/setSystemData?mode=3`;
+
+  const fanSpeed = document.getElementById('fanSpeed').value;
+  document.getElementById('link-fan').href = `${b}/setSystemData?fanSpeed=${encodeURIComponent(fanSpeed)}`;
+  document.getElementById('link-fan-auto').href = `${b}/setSystemData?fanSpeed=auto`;
+
+  const centralTemp = document.getElementById('centralTemp').value;
+  document.getElementById('link-temp').href = `${b}/setSystemData?centralDesiredTemp=${encodeURIComponent(centralTemp)}`;
+
+  document.querySelectorAll('[data-zone-data]').forEach(a => {
+    const z = a.getAttribute('data-zone-data');
+    a.href = `${b}/getZoneData?zone=${z}`;
+  });
+  document.querySelectorAll('[data-zone-on]').forEach(a => {
+    const z = a.getAttribute('data-zone-on');
+    a.href = `${b}/setZoneData?zone=${z}&zoneSetting=1`;
+  });
+  document.querySelectorAll('[data-zone-off]').forEach(a => {
+    const z = a.getAttribute('data-zone-off');
+    a.href = `${b}/setZoneData?zone=${z}&zoneSetting=0`;
+  });
+  document.querySelectorAll('[data-zone-temp-link]').forEach(a => {
+    const z = a.getAttribute('data-zone-temp-link');
+    const temp = document.querySelector(`[data-zone-temp-input="${z}"]`).value;
+    const setting = document.querySelector(`[data-zone-setting="${z}"]`).value;
+    a.href = `${b}/setZoneData?zone=${z}&desiredTemp=${encodeURIComponent(temp)}&zoneSetting=${setting}`;
+  });
+  document.querySelectorAll('[data-zone-percent-link]').forEach(a => {
+    const z = a.getAttribute('data-zone-percent-link');
+    const percent = document.querySelector(`[data-zone-percent-input="${z}"]`).value;
+    const setting = document.querySelector(`[data-zone-setting="${z}"]`).value;
+    a.href = `${b}/setZoneData?zone=${z}&userPercentSetting=${encodeURIComponent(percent)}&zoneSetting=${setting}`;
+  });
+}
+
+document.addEventListener('input', (e) => {
+  const nameZ = e.target.getAttribute && e.target.getAttribute('data-zone-name-input');
+  if (nameZ) {
+    saveZoneName(nameZ, e.target.value);
+    const titleSpan = document.querySelector(`[data-zone-title-name="${nameZ}"]`);
+    if (titleSpan) titleSpan.textContent = e.target.value ? ' — ' + e.target.value : '';
+  }
+  if (CONN_KEYS.includes(e.target.id)) saveConnSettings();
+  updateLinks();
+});
+document.getElementById('zones').addEventListener('change', renderZones);
+
+loadConnSettings();
+renderZones();
+
+// ---- PWA install hint (manual add-to-home-screen; no auto prompt possible on iOS) ----
+(function () {
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const dismissed = localStorage.getItem('installBannerDismissed') === '1';
+  if (isStandalone || dismissed) return;
+
+  const banner = document.getElementById('install-banner');
+  const text = document.getElementById('install-text');
+  if (isIOS) {
+    text.textContent = 'Add this to your Home Screen: tap Share, then "Add to Home Screen".';
+    banner.style.display = 'block';
+  } else {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      text.innerHTML = 'Install this as an app: tap ⋮ menu, then "Add to Home screen" / "Install app".';
+      banner.style.display = 'block';
+    });
+  }
+  document.getElementById('install-dismiss').addEventListener('click', () => {
+    banner.style.display = 'none';
+    localStorage.setItem('installBannerDismissed', '1');
+  });
+})();
+
+// ---- service worker (app-shell caching for offline use) ----
+// Registration requires a secure context (https, or localhost) — silently skipped
+// when this file is opened directly (file://) or served over plain http from a LAN IP.
+if ('serviceWorker' in navigator && window.isSecureContext) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+</script>
+
+</body>
+</html>
