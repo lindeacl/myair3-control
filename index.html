@@ -356,6 +356,25 @@ function proxyPath(path) {
   return `/proxy${path}${sep}_ip=${encodeURIComponent(ipVal())}&_port=${encodeURIComponent(portVal())}`;
 }
 
+// Haptic feedback via the native Taptic Engine (Capacitor Haptics plugin).
+// No-ops on web -- there's no haptic API in iOS Safari/WebKit at all (the
+// Vibration API was never implemented there), and Capacitor.Plugins.Haptics
+// only exists inside the native WKWebView once the plugin's Swift code is
+// linked in (done via `npx cap sync ios` after installing @capacitor/haptics).
+// Also silently no-ops on the iOS Simulator, which has no Taptic Engine
+// hardware -- this is expected, not a bug, and only verifiable on a real device.
+function haptic(kind) {
+  if (!isNative()) return;
+  const H = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics;
+  if (!H) return;
+  try {
+    if (kind === 'light') H.impact({ style: 'Light' });
+    else if (kind === 'medium') H.impact({ style: 'Medium' });
+    else if (kind === 'success') H.notification({ type: 'Success' });
+    else if (kind === 'error') H.notification({ type: 'Error' });
+  } catch (e) {}
+}
+
 const DEFAULT_ZONE_NAMES = { 1: 'MAIN BEDROOM', 2: 'TK BEDROOM', 3: 'SPARE BEDROO' };
 
 function loadZoneNames() {
@@ -523,6 +542,7 @@ document.addEventListener('click', (e) => {
   const stepBtn = e.target.closest('[data-step-target]');
   if (!stepBtn) return;
   e.preventDefault();
+  haptic('light');
   const input = document.querySelector(stepBtn.getAttribute('data-step-target'));
   if (!input) return;
   const delta = parseFloat(stepBtn.getAttribute('data-step-delta'));
@@ -531,6 +551,16 @@ document.addEventListener('click', (e) => {
   let next = Math.min(max, Math.max(min, (parseFloat(input.value) || 0) + delta));
   input.value = Number.isInteger(delta) ? next : next.toFixed(1);
   input.dispatchEvent(new Event('input', { bubbles: true }));
+});
+
+// Light haptic when expanding/collapsing a <details> card (Connection panel,
+// each zone). Skips clicks on a .cmd element inside the summary (the zone
+// On/Off pills) since those already get their own haptic from the .cmd
+// listener below -- without this guard, tapping On/Off would double-buzz.
+document.addEventListener('click', (e) => {
+  if (e.target.closest('a.cmd')) return;
+  if (!e.target.closest('summary')) return;
+  haptic('light');
 });
 
 loadConnSettings();
@@ -712,6 +742,7 @@ function stopPolling() {
 }
 
 document.getElementById('live-poll-toggle').addEventListener('change', (e) => {
+  haptic('light');
   localStorage.setItem('livePollEnabled', e.target.checked ? '1' : '0');
   if (e.target.checked) {
     refreshState();
@@ -739,6 +770,7 @@ document.addEventListener('click', (e) => {
   const link = e.target.closest('a.cmd');
   if (!link) return;
   e.preventDefault();
+  haptic('light');
   sendCommand(link);
 });
 
@@ -748,6 +780,7 @@ document.addEventListener('click', async (e) => {
   const link = e.target.closest('a.data');
   if (!link || !isNative()) return;
   e.preventDefault();
+  haptic('light');
   const href = link.getAttribute('href');
   if (!href || href === '#') return;
   const b = base();
@@ -758,8 +791,10 @@ document.addEventListener('click', async (e) => {
   out.textContent = 'Loading…';
   try {
     out.textContent = await fetchWithTimeout(proxyPath(relPath), 6000);
+    haptic('success');
   } catch (err) {
     out.textContent = `Failed: ${describeFetchError(err)}`;
+    haptic('error');
   }
 });
 document.getElementById('raw-output-close').addEventListener('click', () => {
@@ -778,6 +813,7 @@ async function sendCommand(link) {
     await fetchWithTimeout(proxyPath(relPath), 6000);
     link.classList.remove('pending');
     link.classList.add('sent');
+    haptic('success');
     setTimeout(() => link.classList.remove('sent'), 600);
     // Protect the field this command was for -- even the delayed refresh
     // below, or the 15s auto-refresh, or a refresh from switching back to
@@ -792,6 +828,7 @@ async function sendCommand(link) {
     await refreshState();
   } catch (err) {
     link.classList.remove('pending');
+    haptic('error');
     const statusEl = document.getElementById('live-poll-status');
     if (isNative()) {
       if (statusEl) statusEl.textContent = `Command failed to send: ${describeFetchError(err)}`;
