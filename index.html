@@ -798,6 +798,7 @@ document.addEventListener('click', async (e) => {
   }
 });
 document.getElementById('raw-output-close').addEventListener('click', () => {
+  haptic('light');
   document.getElementById('raw-output-sheet').style.display = 'none';
 });
 
