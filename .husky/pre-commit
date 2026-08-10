@@ -22,3 +22,7 @@ echo "✅ Review marker matches staged changes."
 # check for what's actually in this repo: does the embedded JS parse, and
 # are there no duplicate static ids.
 node scripts/check-html-js.mjs index.html
+
+# ── E2E tests (TESTING_HANDOFF.md) ────────────────────────────────────────────
+# Fast enough (~7s) to run on every commit locally, not just in CI.
+npx playwright test

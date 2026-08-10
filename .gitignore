@@ -5,3 +5,9 @@ test change 1786380035
 .claude/.push-approved
 .claude/.pr-review-pass-*
 .claude/.merge-approved-*
+
+# Node / Playwright
+node_modules/
+test-results/
+playwright-report/
+playwright/.cache/

@@ -13,11 +13,18 @@ Delegate to it after any Edit or Write, before staging.
 A PreToolUse hook blocks `git commit` when no matching review is on record —
 if you hit that block, run the reviewer rather than working around it.
 
-This project has no CI, no test runner, and no `package.json`-based lint/type
-checks (it's static HTML/JS + a Capacitor iOS shell). The pre-commit hook only
-enforces the review-marker check — no mechanical gates (tsc/eslint/vitest) are
-wired in, since none exist here. Push and merge are NOT gated — this is a
-solo, direct-to-main workflow; only the pre-commit review check applies.
+This project has no TS/bundler, so tsc/eslint/madge don't apply. What's
+actually wired into pre-commit and CI instead:
+- `scripts/check-html-js.mjs` — parses every embedded `<script>` block and
+  checks for duplicate static ids (the equivalent of tsc/eslint for a
+  bundler-free static-HTML project).
+- `npx playwright test` — a real E2E suite (`e2e/aircon-control.spec.js`)
+  driving the actual page against a mocked controller, including regression
+  tests for the two real defects this project has already shipped (zone
+  On/Off falling through to raw navigation; a command's own state-refresh
+  racing and clobbering a just-typed value).
+- `.github/workflows/test.yml` runs both on every push/PR — see
+  TESTING_HANDOFF.md's rule that a suite which never runs in CI is decoration.
 
 ## Defect discipline (from DEFECT_DISCIPLINE.md)
 
