@@ -1,0 +1,20 @@
+#!/usr/bin/env sh
+# .husky/pre-commit — the real enforcement boundary. git runs this on every
+# commit regardless of how it was invoked, so unlike the PreToolUse hook it
+# cannot be sidestepped by sh -c or aliases.
+# Emergency bypass (leaves a trace in reflog): git commit --no-verify
+set -e
+
+# ── Code-review gate (Agent Governance Kit) ───────────────────────────────────
+MARKER=".claude/.review-pass"
+if [ ! -f "$MARKER" ]; then
+  echo "❌ No code review on record. Run the code-reviewer subagent before committing." >&2
+  exit 1
+fi
+if [ "$(git diff --cached | shasum -a 256 | cut -d' ' -f1)" != "$(cat "$MARKER")" ]; then
+  echo "❌ Staged changes differ from the reviewed set. Re-run the code-reviewer subagent." >&2
+  exit 1
+fi
+echo "✅ Review marker matches staged changes."
+
+# No mechanical gates wired here (no tsc/eslint/vitest in this project).
