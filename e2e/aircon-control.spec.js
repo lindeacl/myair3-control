@@ -50,6 +50,22 @@ test('zone Off pill also sends silently and does not navigate', async ({ page })
   expect(page.url()).toBe(startUrl);
 });
 
+// Regression test for the bug where a tapped toggle button (Power/Mode/Zone
+// On-Off) only showed as selected once the ENTIRE confirm round-trip
+// finished -- send command, wait 900ms, re-fetch system + every zone
+// sequentially. Against a slow/real controller that's multiple seconds of
+// the button looking unpressed, which read as "my tap didn't register" and
+// prompted tapping again. delayMs simulates a slow controller; the active
+// class must appear well before that delay elapses, proving it's applied
+// optimistically on tap rather than waiting for the network round-trip.
+test('toggle buttons show selected immediately on tap, not after the full confirm round-trip', async ({ page }) => {
+  await mockController(page, { delayMs: 3000 });
+  await page.goto('/index.html');
+  const onLink = page.locator('[data-zone-on="2"]');
+  await onLink.click();
+  await expect(onLink).toHaveClass(/active/, { timeout: 500 });
+});
+
 test('power On/Off command buttons send silently, not via raw navigation', async ({ page }) => {
   await mockController(page);
   await page.goto('/index.html');

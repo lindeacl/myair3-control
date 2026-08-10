@@ -689,9 +689,22 @@ async function refreshState() {
     lastError = err;
   }
 
-  for (let z = 1; z <= n; z++) {
+  // Fetch every zone concurrently instead of one-at-a-time -- with N zones,
+  // sequential fetches take N times as long as the slowest single request to
+  // fully confirm state, which is most of why a button used to take
+  // several seconds to show as selected after a tap.
+  const zoneResults = await Promise.allSettled(
+    Array.from({ length: n }, (_, i) => i + 1).map(z =>
+      fetchWithTimeout(proxyPath(`/getZoneData?zone=${z}`), 6000).then(xml => ({ z, xml }))
+    )
+  );
+  for (const result of zoneResults) {
+    if (result.status !== 'fulfilled') {
+      lastError = result.reason;
+      continue;
+    }
     try {
-      const xml = await fetchWithTimeout(proxyPath(`/getZoneData?zone=${z}`), 6000);
+      const { z, xml } = result.value;
       const setting = parseXmlTag(xml, 'setting');
       const percent = parseXmlTag(xml, 'userPercentSetting');
       const desiredTemp = parseXmlTag(xml, 'desiredTemp');
@@ -771,8 +784,42 @@ document.addEventListener('click', (e) => {
   if (!link) return;
   e.preventDefault();
   haptic('light');
+  applyOptimisticActive(link);
   sendCommand(link);
 });
+
+// Toggle-style buttons (Power, Mode, per-zone On/Off) previously only showed
+// as "selected" once the full confirm round-trip finished -- send command,
+// wait 900ms, re-fetch system state, re-fetch every zone. That's several
+// seconds of the button looking unpressed, which reads as "my tap didn't
+// register" and invites tapping again. Apply the obvious visual result
+// immediately on tap instead; refreshState() still runs afterward and will
+// correct this if the unit's actual state turns out to differ.
+function applyOptimisticActive(link) {
+  const pairs = [
+    ['link-on', 'link-off'],
+    ['link-mode-1', 'link-mode-2', 'link-mode-3'],
+  ];
+  for (const group of pairs) {
+    if (group.includes(link.id)) {
+      group.forEach(id => setActive(id, id === link.id));
+      return;
+    }
+  }
+  const zOn = link.getAttribute('data-zone-on');
+  if (zOn) {
+    link.classList.add('active');
+    const off = document.querySelector(`[data-zone-off="${zOn}"]`);
+    if (off) off.classList.remove('active');
+    return;
+  }
+  const zOff = link.getAttribute('data-zone-off');
+  if (zOff) {
+    link.classList.add('active');
+    const on = document.querySelector(`[data-zone-on="${zOff}"]`);
+    if (on) on.classList.remove('active');
+  }
+}
 
 // ---- data buttons (.data): in the native app there's no such thing as
 // "open in a new tab", so fetch and show the raw XML inline instead.

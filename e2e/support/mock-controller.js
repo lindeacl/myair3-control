@@ -2,7 +2,7 @@
 // origin's /proxy route (the path the app always uses when not running
 // natively). Lets tests drive the exact same request shape the real device
 // would receive, without a real controller on the network.
-export async function mockController(page, { staleGetSystemData = false } = {}) {
+export async function mockController(page, { staleGetSystemData = false, delayMs = 0 } = {}) {
   const state = {
     airconOnOff: '0',
     mode: '1',
@@ -20,6 +20,7 @@ export async function mockController(page, { staleGetSystemData = false } = {}) 
   const staleSnapshot = { ...state };
 
   await page.route('**/proxy**', async (route) => {
+    if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs));
     const url = new URL(route.request().url());
     const path = url.pathname.replace(/^\/proxy/, '');
     const params = url.searchParams;
