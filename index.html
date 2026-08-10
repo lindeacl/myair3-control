@@ -403,8 +403,8 @@ function renderZones() {
         <span class="zone-summary-name" data-zone-title-name="${z}">${zoneName}</span>
         <span class="zone-temp-badge" data-zone-title-temp="${z}">${temp.value ? temp.value + '°C' : ''}</span>
         <span class="zone-onoff">
-          <a class="cmd off" data-zone-off="${z}" href="#" target="_blank" rel="noopener" onclick="event.stopPropagation()">Off</a>
-          <a class="cmd" data-zone-on="${z}" href="#" target="_blank" rel="noopener" onclick="event.stopPropagation()">On</a>
+          <a class="cmd off" data-zone-off="${z}" href="#" target="_blank" rel="noopener" onclick="event.preventDefault()">Off</a>
+          <a class="cmd" data-zone-on="${z}" href="#" target="_blank" rel="noopener" onclick="event.preventDefault()">On</a>
         </span>
         <span class="chev">›</span>
       </summary>
