@@ -17,4 +17,8 @@ if [ "$(git diff --cached | shasum -a 256 | cut -d' ' -f1)" != "$(cat "$MARKER")
 fi
 echo "✅ Review marker matches staged changes."
 
-# No mechanical gates wired here (no tsc/eslint/vitest in this project).
+# ── Mechanical gate (Agent Governance Kit — adapted for this project) ────────
+# No tsc/eslint/vitest here (no bundler, no TS) -- this is the equivalent
+# check for what's actually in this repo: does the embedded JS parse, and
+# are there no duplicate static ids.
+node scripts/check-html-js.mjs index.html

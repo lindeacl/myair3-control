@@ -2,3 +2,6 @@
 # Agent Governance Kit — code-review marker
 .claude/.review-pass
 test change 1786380035
+.claude/.push-approved
+.claude/.pr-review-pass-*
+.claude/.merge-approved-*

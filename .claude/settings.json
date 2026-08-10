@@ -7,6 +7,14 @@
           {
             "type": "command",
             "command": "./scripts/require-review.sh"
+          },
+          {
+            "type": "command",
+            "command": "./scripts/require-push-approval.sh"
+          },
+          {
+            "type": "command",
+            "command": "./scripts/require-merge-approval.sh"
           }
         ]
       }

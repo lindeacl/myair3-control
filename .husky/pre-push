@@ -1,0 +1,32 @@
+#!/usr/bin/env sh
+# .husky/pre-push — the real enforcement boundary. git runs this on every push
+# regardless of how it was invoked, so unlike the PreToolUse hook it cannot be
+# sidestepped by sh -c or aliases.
+# Emergency bypass (leaves a trace in reflog): git push --no-verify
+set -e
+
+# ── Branch exemption (PR Workflow Kit) ────────────────────────────────────────
+# Feature branches push freely — nothing user-facing happens until merge, so
+# there's nothing to gate yet. Only protected branches hit the push-approval
+# check below.
+PROTECTED_BRANCHES="main master"
+CURRENT_BRANCH=$(git branch --show-current)
+IS_PROTECTED=false
+for b in $PROTECTED_BRANCHES; do
+  [ "$CURRENT_BRANCH" = "$b" ] && IS_PROTECTED=true
+done
+if [ "$IS_PROTECTED" = false ]; then
+  echo "✅ Pushing non-protected branch '$CURRENT_BRANCH' — push-approval gate skipped."
+  exit 0
+fi
+
+# ── Push-approval gate (Agent Governance Kit) ─────────────────────────────────
+MARKER=".claude/.push-approved"
+HEAD_SHA=$(git rev-parse HEAD)
+if [ ! -f "$MARKER" ] || [ "$(cat "$MARKER")" != "$HEAD_SHA" ]; then
+  echo "❌ No fresh push approval on record for $HEAD_SHA." >&2
+  echo "   To approve manually: echo $HEAD_SHA > $MARKER" >&2
+  echo "   Emergency bypass (leaves a trace): git push --no-verify" >&2
+  exit 1
+fi
+echo "✅ Push approval matches HEAD ($HEAD_SHA)."
