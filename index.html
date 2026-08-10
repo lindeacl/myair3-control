@@ -755,6 +755,11 @@ async function sendCommand(link) {
     link.classList.remove('pending');
     link.classList.add('sent');
     setTimeout(() => link.classList.remove('sent'), 600);
+    // Give the unit a moment to actually apply the change before re-reading
+    // its state -- querying immediately can race the unit's own internal
+    // update and read back the pre-change value, which then overwrites
+    // whatever you just typed (looks like your input "didn't take").
+    await new Promise(r => setTimeout(r, 900));
     await refreshState();
   } catch (err) {
     link.classList.remove('pending');
