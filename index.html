@@ -593,8 +593,32 @@ function setActive(id, isActive) {
   const el = document.getElementById(id);
   if (el) el.classList.toggle('active', isActive);
 }
+
+// Protects a just-edited field from being overwritten by a state refresh for
+// a few seconds after sending a command -- the unit doesn't apply changes
+// instantly, so a refresh landing in that window (the 15s auto-refresh, or
+// switching back to the app) would otherwise read back the pre-change value
+// and stomp on what you just entered, making it look like the input didn't
+// take even though it was actually sent and accepted.
+const recentlySent = new Map();
+function markRecentlySent(el, ms = 5000) {
+  if (el) recentlySent.set(el, Date.now() + ms);
+}
 function setValueUnlessFocused(el, value) {
-  if (el && value !== null && document.activeElement !== el) el.value = value;
+  if (!el || value === null) return;
+  if (document.activeElement === el) return;
+  const expiry = recentlySent.get(el);
+  if (expiry && Date.now() < expiry) return;
+  el.value = value;
+}
+function getAssociatedInput(link) {
+  if (link.id === 'link-temp') return document.getElementById('centralTemp');
+  if (link.id === 'link-fan') return document.getElementById('fanSpeed');
+  const zTemp = link.getAttribute('data-zone-temp-link');
+  if (zTemp) return document.querySelector(`[data-zone-temp-input="${zTemp}"]`);
+  const zPct = link.getAttribute('data-zone-percent-link');
+  if (zPct) return document.querySelector(`[data-zone-percent-input="${zPct}"]`);
+  return null;
 }
 
 // Reads getSystemData + every zone's getZoneData and reflects the real device
@@ -755,6 +779,11 @@ async function sendCommand(link) {
     link.classList.remove('pending');
     link.classList.add('sent');
     setTimeout(() => link.classList.remove('sent'), 600);
+    // Protect the field this command was for -- even the delayed refresh
+    // below, or the 15s auto-refresh, or a refresh from switching back to
+    // the app, could otherwise land before the unit finishes applying the
+    // change and stomp your entry back to the old value.
+    markRecentlySent(getAssociatedInput(link));
     // Give the unit a moment to actually apply the change before re-reading
     // its state -- querying immediately can race the unit's own internal
     // update and read back the pre-change value, which then overwrites
