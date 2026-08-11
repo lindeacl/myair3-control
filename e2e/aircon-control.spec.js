@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 import { mockController } from './support/mock-controller.js';
 
 // addInitScript reruns on every navigation (including reload()) -- fine for

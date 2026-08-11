@@ -25,6 +25,14 @@ actually wired into pre-commit and CI instead:
   racing and clobbering a just-typed value).
 - `.github/workflows/test.yml` runs both on every push/PR — see
   TESTING_HANDOFF.md's rule that a suite which never runs in CI is decoration.
+- `scripts/check-coverage.mjs` — no Vitest/unit layer exists here (nothing
+  isolable to unit-test in a single-file, bundler-free app), so this measures
+  real V8 execution coverage of index.html's inline script during the E2E
+  run instead, via `e2e/fixtures.js`. Floor is 70% (measured 79.7%, minus a
+  hair — TESTING_HANDOFF.md's "ratchet, not a target"). Known gaps not
+  covered: Mode buttons, fan speed, native-only paths (raw-output fetch,
+  haptics — `isNative()` is always false under Playwright), and error/timeout
+  paths. Raise the floor as the suite grows; never lower it without saying why.
 
 ## Defect discipline (from DEFECT_DISCIPLINE.md)
 

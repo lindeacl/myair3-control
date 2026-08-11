@@ -10,3 +10,6 @@ node_modules/
 test-results/
 playwright-report/
 playwright/.cache/
+
+# V8 coverage raw data
+coverage-raw/
