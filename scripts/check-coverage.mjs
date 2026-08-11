@@ -16,7 +16,7 @@ import fs from 'fs';
 import path from 'path';
 
 const DIR = path.join(process.cwd(), 'coverage-raw');
-// Floor = measured reality (79.7% as of the E2E suite this was set against)
+// Floor = measured reality (84.8% as of the E2E suite this was set against)
 // minus a hair for churn, per TESTING_HANDOFF.md's coverage policy: this is
 // a regression floor, not a target -- raise it as the suite grows, never
 // lower it without a comment explaining why.
@@ -29,7 +29,7 @@ const DIR = path.join(process.cwd(), 'coverage-raw');
 // instance, whose coverage is best-effort. This is a tooling gap, not an app
 // gap; it makes the number a slight underestimate, not an overestimate.
 const floorArg = process.argv.find((a) => a.startsWith('--floor='));
-const FLOOR = floorArg ? Number(floorArg.split('=')[1]) : 70;
+const FLOOR = floorArg ? Number(floorArg.split('=')[1]) : 80;
 
 if (!fs.existsSync(DIR)) {
   console.error('✖ No coverage-raw/ directory found — run `npx playwright test` first.');
