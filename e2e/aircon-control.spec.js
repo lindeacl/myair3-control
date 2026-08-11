@@ -112,3 +112,72 @@ test('connection settings persist across reload via localStorage', async ({ page
   await page.locator('#connection-details summary').click();
   await expect(page.locator('#ip')).toHaveValue('10.0.0.50');
 });
+
+test('mode buttons (Cool/Heat/Fan) send silently and show selected', async ({ page }) => {
+  await mockController(page);
+  await page.goto('/index.html');
+  const requestPromise = page.waitForRequest((req) => req.url().includes('/setSystemData') && req.url().includes('mode=2'));
+  await page.locator('#link-mode-2').click();
+  await requestPromise;
+  await expect(page.locator('#link-mode-2')).toHaveClass(/active/, { timeout: 3000 });
+});
+
+test('fan speed set and Auto both send the correct value', async ({ page }) => {
+  await mockController(page);
+  await page.goto('/index.html');
+
+  const fanInput = page.locator('#fanSpeed');
+  await fanInput.fill('3');
+  await fanInput.dispatchEvent('input');
+  const setPromise = page.waitForRequest((req) => req.url().includes('/setSystemData') && req.url().includes('fanSpeed=3'));
+  await page.locator('#link-fan').click();
+  await setPromise;
+
+  const autoPromise = page.waitForRequest((req) => req.url().includes('/setSystemData') && req.url().includes('fanSpeed=auto'));
+  await page.locator('#link-fan-auto').click();
+  await autoPromise;
+});
+
+// A network failure shouldn't leave a button permanently stuck mid-tap, and
+// on the web build (no silent-send fallback available) it should fall back
+// to opening the raw link directly rather than doing nothing.
+test('a failed command clears its pending state instead of hanging', async ({ page, context }) => {
+  await mockController(page);
+  await page.goto('/index.html');
+
+  await page.route('**/proxy/setSystemData**', (route) => route.abort('failed'));
+  const popupPromise = context.waitForEvent('page');
+
+  await page.locator('#link-on').click();
+  const popup = await popupPromise;
+  await popup.close();
+
+  await expect(page.locator('#link-on')).not.toHaveClass(/pending/);
+});
+
+// isNative() is always false under Playwright (there's no real Capacitor
+// native bridge in a plain browser), so the native-only branches -- the
+// "Get System Data"/"Get Zone Data" raw-output fetch, and proxyPath() going
+// direct-to-controller instead of through /proxy -- never executed in this
+// suite at all. Faking window.Capacitor before the page loads exercises that
+// code path for real, including that it fetches the DIRECT (non-proxy) URL.
+test('native-only: Get System Data shows raw XML inline instead of navigating', async ({ page }) => {
+  const nativeBase = 'http://192.168.1.192:2025';
+  await page.addInitScript(() => {
+    window.Capacitor = {
+      isNativePlatform: () => true,
+      Plugins: { Haptics: { impact: async () => {}, notification: async () => {} } },
+    };
+  });
+  await mockController(page, { nativeBase });
+  await page.goto('/index.html');
+
+  const startUrl = page.url();
+  await page.locator('#connection-details summary').click();
+  await page.locator('#link-status').click();
+
+  const sheet = page.locator('#raw-output-sheet');
+  await expect(sheet).toBeVisible();
+  await expect(page.locator('#raw-output')).toContainText('<systemData>');
+  expect(page.url()).toBe(startUrl); // must not have navigated to the raw XML like the web fallback does
+});
