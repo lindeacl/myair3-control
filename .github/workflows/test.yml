@@ -17,6 +17,7 @@ jobs:
       - run: node scripts/check-html-js.mjs index.html
       - run: npx playwright install --with-deps chromium
       - run: npx playwright test
+      - run: node scripts/check-coverage.mjs
       - name: Fail if any test can silently skip
         run: |
           if grep -rE '\btest\.(skip|fixme)\(' e2e/; then
