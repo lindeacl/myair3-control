@@ -21,9 +21,15 @@ export async function mockController(page, { staleGetSystemData = false, delayMs
       3: { setting: '0', userPercentSetting: '80', desiredTemp: '22', actualTemp: '19.8' },
     },
   };
-  // Snapshot used for getSystemData responses when staleGetSystemData is on —
-  // simulates the real unit not having applied a just-sent command yet.
-  const staleSnapshot = { ...state };
+  // Snapshot used for getSystemData/getZoneData responses when
+  // staleGetSystemData is on — simulates the real unit not having applied a
+  // just-sent command yet. Zone entries need their own copies, not just the
+  // top-level spread, since setZoneData mutates each zone object in place
+  // and a shared reference would let the "stale" snapshot drift anyway.
+  const staleSnapshot = {
+    ...state,
+    zones: Object.fromEntries(Object.entries(state.zones).map(([z, zs]) => [z, { ...zs }])),
+  };
 
   function respondFor(path, params) {
     if (path === '/getSystemData') {
@@ -42,7 +48,7 @@ export async function mockController(page, { staleGetSystemData = false, delayMs
     }
     if (path === '/getZoneData') {
       const z = params.get('zone');
-      const zs = state.zones[z];
+      const zs = staleGetSystemData ? staleSnapshot.zones[z] : state.zones[z];
       return {
         contentType: 'application/xml',
         body: `<zoneData><setting>${zs.setting}</setting><userPercentSetting>${zs.userPercentSetting}</userPercentSetting><desiredTemp>${zs.desiredTemp}</desiredTemp><actualTemp>${zs.actualTemp}</actualTemp></zoneData>`,

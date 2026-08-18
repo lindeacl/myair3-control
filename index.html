@@ -619,20 +619,27 @@ function describeFetchError(err) {
 
 let pollTimer = null;
 
-function setActive(id, isActive) {
-  const el = document.getElementById(id);
-  if (el) el.classList.toggle('active', isActive);
-}
-
-// Protects a just-edited field from being overwritten by a state refresh for
-// a few seconds after sending a command -- the unit doesn't apply changes
-// instantly, so a refresh landing in that window (the 15s auto-refresh, or
-// switching back to the app) would otherwise read back the pre-change value
-// and stomp on what you just entered, making it look like the input didn't
-// take even though it was actually sent and accepted.
+// Protects a just-edited field OR a just-tapped toggle button from being
+// overwritten by a state refresh for a few seconds after sending a command
+// -- the unit doesn't apply changes instantly, so a refresh landing in that
+// window (the 15s auto-refresh, switching back to the app, or the delayed
+// refresh sendCommand itself triggers) would otherwise read back the
+// pre-change value/state and stomp on what was just set. Originally this
+// only covered text inputs (temp/fan-speed fields); setActive() itself had
+// no such protection, so Power/Mode/Zone On-Off buttons could visibly
+// revert to the old state moments after being tapped, looking exactly like
+// the tap "didn't register" and prompting a second tap. Same bug class,
+// same fix, applied to every element that shows live device state.
 const recentlySent = new Map();
 function markRecentlySent(el, ms = 5000) {
   if (el) recentlySent.set(el, Date.now() + ms);
+}
+// Drops the protection early. Used when a command demonstrably failed to
+// reach the unit: the optimistic state it was protecting is known-wrong at
+// that point, so continuing to shield it from refreshState() would keep a
+// stale highlight/value on screen that nothing is allowed to correct.
+function clearRecentlySent(el) {
+  if (el) recentlySent.delete(el);
 }
 function setValueUnlessFocused(el, value) {
   if (!el || value === null) return;
@@ -641,14 +648,35 @@ function setValueUnlessFocused(el, value) {
   if (expiry && Date.now() < expiry) return;
   el.value = value;
 }
-function getAssociatedInput(link) {
-  if (link.id === 'link-temp') return document.getElementById('centralTemp');
-  if (link.id === 'link-fan') return document.getElementById('fanSpeed');
+function setActiveEl(el, isActive) {
+  if (!el) return;
+  const expiry = recentlySent.get(el);
+  if (expiry && Date.now() < expiry) return;
+  el.classList.toggle('active', isActive);
+}
+function setActive(id, isActive) {
+  setActiveEl(document.getElementById(id), isActive);
+}
+// Every control whose value this command carried, and which a stale refresh
+// could therefore stomp back to the pre-command state. The zone temp/damper
+// commands bake the zone's on/off <select> into the same request URL, so
+// that select needs the same protection as the number field: if a stale
+// refresh flipped it back, the NEXT tap of the same ✓ would send the OLD
+// zoneSetting and silently switch the zone off.
+function getAssociatedInputs(link) {
+  if (link.id === 'link-temp') return [document.getElementById('centralTemp')];
+  if (link.id === 'link-fan') return [document.getElementById('fanSpeed')];
   const zTemp = link.getAttribute('data-zone-temp-link');
-  if (zTemp) return document.querySelector(`[data-zone-temp-input="${zTemp}"]`);
+  if (zTemp) return [
+    document.querySelector(`[data-zone-temp-input="${zTemp}"]`),
+    document.querySelector(`[data-zone-setting="${zTemp}"]`),
+  ];
   const zPct = link.getAttribute('data-zone-percent-link');
-  if (zPct) return document.querySelector(`[data-zone-percent-input="${zPct}"]`);
-  return null;
+  if (zPct) return [
+    document.querySelector(`[data-zone-percent-input="${zPct}"]`),
+    document.querySelector(`[data-zone-setting="${zPct}"]`),
+  ];
+  return [];
 }
 
 // Reads getSystemData + every zone's getZoneData and reflects the real device
@@ -674,10 +702,17 @@ async function refreshState() {
     setActive('link-mode-1', mode === '1');
     setActive('link-mode-2', mode === '2');
     setActive('link-mode-3', mode === '3');
+    const centralTempInput = document.getElementById('centralTemp');
     setValueUnlessFocused(document.getElementById('fanSpeed'), fanSpeed);
-    setValueUnlessFocused(document.getElementById('centralTemp'), centralDesiredTemp);
+    setValueUnlessFocused(centralTempInput, centralDesiredTemp);
+    // Mirror the INPUT, not the raw response. setValueUnlessFocused() may have
+    // declined the write (field focused, or inside its grace window), and
+    // painting the response straight onto the big display anyway would leave
+    // it contradicting the field it labels -- the field keeping your 24.5
+    // while the headline number snaps back to 22.0 looks just as much like
+    // "the change didn't take" as the button reverting did.
     const centralDisplay = document.getElementById('central-temp-display');
-    if (centralDisplay && centralDesiredTemp !== null) centralDisplay.textContent = parseFloat(centralDesiredTemp).toFixed(1) + '°';
+    if (centralDisplay && centralTempInput) centralDisplay.textContent = (parseFloat(centralTempInput.value) || 0).toFixed(1) + '°';
 
     const note = document.getElementById('central-state-note');
     if (note) {
@@ -712,15 +747,21 @@ async function refreshState() {
 
       const onBtn = document.querySelector(`[data-zone-on="${z}"]`);
       const offBtn = document.querySelector(`[data-zone-off="${z}"]`);
-      if (onBtn) onBtn.classList.toggle('active', setting === '1');
-      if (offBtn) offBtn.classList.toggle('active', setting === '0');
+      setActiveEl(onBtn, setting === '1');
+      setActiveEl(offBtn, setting === '0');
 
-      const settingSelect = document.querySelector(`[data-zone-setting="${z}"]`);
-      if (settingSelect && document.activeElement !== settingSelect && setting !== null) settingSelect.value = setting;
-      setValueUnlessFocused(document.querySelector(`[data-zone-percent-input="${z}"]`), percent);
+      // Same helper as every other value write, rather than a bespoke
+      // focus-only check: this select is not just a readout, its value is
+      // baked into the zone's temp/damper command URLs, so a stale refresh
+      // overwriting it changes what the next ✓ tap actually sends.
+      setValueUnlessFocused(document.querySelector(`[data-zone-setting="${z}"]`), setting);
+      const percentInput = document.querySelector(`[data-zone-percent-input="${z}"]`);
+      setValueUnlessFocused(percentInput, percent);
       setValueUnlessFocused(document.querySelector(`[data-zone-temp-input="${z}"]`), desiredTemp);
+      // Mirrors the slider for the same reason the central display mirrors
+      // its input -- see the comment above.
       const percentDisplay = document.querySelector(`[data-zone-percent-display="${z}"]`);
-      if (percentDisplay && percent !== null) percentDisplay.textContent = percent + '%';
+      if (percentDisplay && percentInput) percentDisplay.textContent = percentInput.value + '%';
 
       if (actualTemp !== null) {
         saveZoneTemp(z, actualTemp);
@@ -793,31 +834,41 @@ document.addEventListener('click', (e) => {
 // wait 900ms, re-fetch system state, re-fetch every zone. That's several
 // seconds of the button looking unpressed, which reads as "my tap didn't
 // register" and invites tapping again. Apply the obvious visual result
-// immediately on tap instead; refreshState() still runs afterward and will
-// correct this if the unit's actual state turns out to differ.
-function applyOptimisticActive(link) {
+// immediately on tap instead.
+//
+// A guess still gets corrected against the unit, but NOT by the confirm
+// refresh sendCommand() fires ~900ms later: that one lands inside the grace
+// window below, and ignoring exactly that too-early read is the whole point
+// of the window. Correction comes from the next refresh AFTER the window
+// expires (the 15s auto-poll, returning to the tab, or a later command's
+// refresh), or immediately from sendCommand()'s error path, which releases
+// the window as soon as the send is known to have failed.
+//
+// Every element in the group is set directly rather than via setActiveEl(),
+// because setActiveEl()'s grace-window check would otherwise block a second
+// tap (e.g. On then Off) from flipping a peer button still inside the FIRST
+// tap's window. markRecentlySent() is then applied to the whole group, so a
+// stale refresh can't revert any of them mid-window.
+function optimisticPeerGroup(link) {
   const pairs = [
     ['link-on', 'link-off'],
     ['link-mode-1', 'link-mode-2', 'link-mode-3'],
   ];
   for (const group of pairs) {
-    if (group.includes(link.id)) {
-      group.forEach(id => setActive(id, id === link.id));
-      return;
-    }
+    if (group.includes(link.id)) return group.map(id => document.getElementById(id)).filter(Boolean);
   }
-  const zOn = link.getAttribute('data-zone-on');
-  if (zOn) {
-    link.classList.add('active');
-    const off = document.querySelector(`[data-zone-off="${zOn}"]`);
-    if (off) off.classList.remove('active');
-    return;
-  }
-  const zOff = link.getAttribute('data-zone-off');
-  if (zOff) {
-    link.classList.add('active');
-    const on = document.querySelector(`[data-zone-on="${zOff}"]`);
-    if (on) on.classList.remove('active');
+  const z = link.getAttribute('data-zone-on') || link.getAttribute('data-zone-off');
+  if (z) return [
+    document.querySelector(`[data-zone-on="${z}"]`),
+    document.querySelector(`[data-zone-off="${z}"]`),
+  ].filter(Boolean);
+  return [];
+}
+
+function applyOptimisticActive(link) {
+  for (const el of optimisticPeerGroup(link)) {
+    el.classList.toggle('active', el === link);
+    markRecentlySent(el);
   }
 }
 
@@ -867,7 +918,7 @@ async function sendCommand(link) {
     // below, or the 15s auto-refresh, or a refresh from switching back to
     // the app, could otherwise land before the unit finishes applying the
     // change and stomp your entry back to the old value.
-    markRecentlySent(getAssociatedInput(link));
+    getAssociatedInputs(link).forEach(el => markRecentlySent(el));
     // Give the unit a moment to actually apply the change before re-reading
     // its state -- querying immediately can race the unit's own internal
     // update and read back the pre-change value, which then overwrites
@@ -877,6 +928,14 @@ async function sendCommand(link) {
   } catch (err) {
     link.classList.remove('pending');
     haptic('error');
+    // The command never reached the unit, so the optimistic highlight applied
+    // on tap (and any field this command carried) is now known-wrong. Drop the
+    // grace window immediately instead of letting it shield that wrong state
+    // for the full 5s -- otherwise the one case where we're certain the
+    // optimistic guess is bad is also the case refreshState() is forbidden
+    // from fixing.
+    for (const el of optimisticPeerGroup(link)) clearRecentlySent(el);
+    for (const el of getAssociatedInputs(link)) clearRecentlySent(el);
     const statusEl = document.getElementById('live-poll-status');
     if (isNative()) {
       if (statusEl) statusEl.textContent = `Command failed to send: ${describeFetchError(err)}`;
