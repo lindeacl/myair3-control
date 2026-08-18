@@ -88,3 +88,44 @@ confirm merging *this specific PR* in *this turn*, then write
 `.claude/.merge-approved-<PR#>` with the same head SHA. A PreToolUse hook
 blocks the merge call unless both markers exist and match; GitHub branch
 protection on `main` is the actual server-side boundary.
+
+## Infra change policy
+
+`.claude/infra-gate.patterns` is deliberately empty — this project has zero
+cloud infrastructure, zero Terraform, zero cloud CLI usage, and zero DB
+migrations, so there is nothing destructive to gate today. The hook
+(`scripts/require-infra-approval.sh`) is wired in and will start enforcing
+the moment a real pattern is added — if this project ever grows a deploy
+pipeline, a cloud backend, or a database, add the matching pattern to
+`.claude/infra-gate.patterns` before running anything destructive against it.
+
+## Defect density policy
+
+Every Critical/Warning the code-reviewer fixes, and every production
+incident, gets logged: `scripts/log-defect.sh --severity ... --class ...
+--files ... --source review|incident`. Name the bug's CLASS (see
+docs/DEFECT_DISCIPLINE.md Rule 1), not just the instance.
+
+Defect density (`scripts/defect-density.sh`) is reported on every CI run for
+visibility — it never blocks a push or PR, only a release (a `git tag v*`,
+`gh release create`, or `npm version` command — none of which this project
+currently uses, so the release gate is dormant until one does). The
+threshold in `.claude/defect-density.config.json` was bootstrapped from this
+project's actual history (the two real defects found and fixed earlier in
+this project's life — see `.claude/defects.jsonl`), not a guess. It's a
+ratchet — lower it as the codebase matures, never raise it without a comment
+explaining why.
+
+## Dependency scanning
+
+`npm audit --audit-level=high` runs in CI on every push/PR (TESTING_HANDOFF.md
+§5), gated on high/critical findings only. Moderate/low findings are visible
+but don't block — see this repo's CI run for anything currently accepted and
+why (documented at the point the finding first appeared, not silently ignored).
+
+## Reference docs
+
+`docs/` holds full copies of the playbooks this project's CLAUDE.md summarizes:
+`DEFECT_DISCIPLINE.md`, `TESTING_HANDOFF.md`, `INCIDENT_RESPONSE.md`,
+`DEFECT_DENSITY_KIT.md`, `infra-gate-kit.md`. `docs/postmortems/` is where an
+incident postmortem goes if one is ever needed (see `INCIDENT_RESPONSE.md`).

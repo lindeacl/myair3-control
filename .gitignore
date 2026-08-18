@@ -13,3 +13,9 @@ playwright/.cache/
 
 # V8 coverage raw data
 coverage-raw/
+
+# Infra Gate Kit — per-command approval markers
+.claude/.infra-approved-*
+
+# Defect Density Kit — release-gate pass markers
+.claude/.density-pass-*

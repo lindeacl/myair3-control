@@ -6,7 +6,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./scripts/require-review.sh"
+            "command": "./scripts/require-infra-approval.sh"
+          },
+          {
+            "type": "command",
+            "command": "./scripts/require-merge-approval.sh"
           },
           {
             "type": "command",
@@ -14,7 +18,11 @@
           },
           {
             "type": "command",
-            "command": "./scripts/require-merge-approval.sh"
+            "command": "./scripts/require-release-density.sh"
+          },
+          {
+            "type": "command",
+            "command": "./scripts/require-review.sh"
           }
         ]
       }

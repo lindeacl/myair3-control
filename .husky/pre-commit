@@ -17,6 +17,23 @@ if [ "$(git diff --cached | shasum -a 256 | cut -d' ' -f1)" != "$(cat "$MARKER")
 fi
 echo "✅ Review marker matches staged changes."
 
+# ── Secret-scan gate (Agent Governance Kit) ───────────────────────────────────
+# Mechanical, not LLM-judgment — catches known credential patterns even if the
+# reviewer missed one. Soft-fails (warns, doesn't block) if gitleaks isn't
+# installed, so it can't brick commits before it's set up -- but it's loud
+# about it either way.
+if command -v gitleaks >/dev/null 2>&1; then
+  if ! gitleaks protect --staged --redact --no-banner; then
+    echo "❌ gitleaks found a likely secret in staged changes. Fix it, or for a" >&2
+    echo "   confirmed false positive, allowlist it BY FINGERPRINT in .gitleaks.toml" >&2
+    echo "   (never allowlist by file — that blinds future real secrets in it)." >&2
+    exit 1
+  fi
+  echo "✅ Secret scan clean."
+else
+  echo "⚠️  gitleaks not installed — secret-scan gate SKIPPED (install: brew install gitleaks)." >&2
+fi
+
 # ── Mechanical gate (Agent Governance Kit — adapted for this project) ────────
 # No tsc/eslint/vitest here (no bundler, no TS) -- this is the equivalent
 # check for what's actually in this repo: does the embedded JS parse, and
