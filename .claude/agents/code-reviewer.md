@@ -14,6 +14,11 @@ Process:
 1. Run `git diff --cached` (and `git diff` for unstaged work).
 2. Review every changed hunk against the checklist below.
 3. Fix Critical and Warning issues directly with Edit. Do not hand them back.
+3.5. For each Critical/Warning fixed, log it before writing the pass marker:
+     scripts/log-defect.sh --severity <Critical|Warning> --class "<bug class>" \
+       --files "<comma-separated changed files>" --source review
+     Name the CLASS per DEFECT_DISCIPLINE Rule 1 — not "fixed a bug in
+     foo.js" but "N+1 query," "missing tenant-scoping check," etc.
 4. Re-read what you changed and confirm the fix is correct.
 5. Only when zero Critical issues remain, run:
    git diff --cached | shasum -a 256 | cut -d' ' -f1 > .claude/.review-pass

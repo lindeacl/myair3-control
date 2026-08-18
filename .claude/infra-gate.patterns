@@ -1,0 +1,11 @@
+# Infra Gate Kit — destructive command patterns
+# One grep -E pattern per line. Lines starting with # are comments.
+#
+# Deliberately EMPTY, not the upstream kit's cloud-tooling defaults
+# (Terraform/GCP/AWS/Azure/k8s/DB-migration/Docker patterns) — this project
+# is a static HTML app + a Capacitor iOS shell with zero cloud infrastructure,
+# zero Terraform, zero cloud CLI usage, and zero DB migrations. Copying those
+# patterns in verbatim would be dead weight that never matches anything and
+# creates false confidence that "infra is gated" for a project with no infra
+# to gate. If this project ever grows real infra tooling (a deploy pipeline,
+# a cloud backend, a database), add the matching pattern here THEN.
