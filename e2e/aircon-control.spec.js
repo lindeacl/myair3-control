@@ -102,6 +102,114 @@ test('central temp field holds the value you just set even if a refresh reads st
   await expect(tempInput).toHaveValue('24.5');
 });
 
+// Regression test for the same bug class as above, but for toggle buttons
+// (Power/Mode/Zone On-Off) rather than text fields: setActive() had no
+// grace-window protection at all, unlike setValueUnlessFocused(), so a
+// refresh landing before the (simulated slow/stale) unit caught up would
+// silently flip the button back off, looking exactly like the tap didn't
+// register and prompting a second tap.
+test('power On button stays selected even if a refresh reads stale state', async ({ page }) => {
+  await mockController(page, { staleGetSystemData: true });
+  await page.goto('/index.html');
+
+  const onLink = page.locator('#link-on');
+  const requestPromise = page.waitForRequest((req) => req.url().includes('/setSystemData') && req.url().includes('airconOnOff=1'));
+  await onLink.click();
+  await requestPromise;
+
+  // Give the app's internal 900ms delay + refreshState() call time to run
+  // against the stale (never-catches-up) snapshot -- if the grace window
+  // were broken, this is where the button would revert.
+  await page.waitForTimeout(1500);
+
+  await expect(onLink).toHaveClass(/active/);
+});
+
+// Same bug class, zone On/Off variant: refreshState() sets these via a
+// direct classList.toggle() rather than setActive(), so it's a distinct
+// code path that needs its own coverage even though the fix is the same.
+test('zone On button stays selected even if a refresh reads stale state', async ({ page }) => {
+  await mockController(page, { staleGetSystemData: true });
+  await page.goto('/index.html');
+
+  const onLink = page.locator('[data-zone-on="2"]');
+  const requestPromise = page.waitForRequest((req) => req.url().includes('/setZoneData') && req.url().includes('zone=2') && req.url().includes('zoneSetting=1'));
+  await onLink.click();
+  await requestPromise;
+
+  await page.waitForTimeout(1500);
+
+  await expect(onLink).toHaveClass(/active/);
+});
+
+// Same bug class again, but for the read-only elements that MIRROR a
+// protected control. The grace window kept #centralTemp at 24.5, while the
+// headline display next to it was painted straight from the stale response
+// and snapped back to 22.0 -- a half-reverted UI that reads as "didn't take"
+// exactly like the button reverting did.
+test('the big central temp display holds the value you just set, matching its input', async ({ page }) => {
+  await mockController(page, { staleGetSystemData: true });
+  await page.goto('/index.html');
+
+  const tempInput = page.locator('#centralTemp');
+  await tempInput.fill('24.5');
+  await tempInput.dispatchEvent('input');
+
+  const requestPromise = page.waitForRequest((req) => req.url().includes('/setSystemData') && req.url().includes('centralDesiredTemp=24.5'));
+  await page.locator('#link-temp').click();
+  await requestPromise;
+
+  await page.waitForTimeout(1500);
+
+  await expect(page.locator('#central-temp-display')).toHaveText('24.5°');
+  await expect(tempInput).toHaveValue('24.5');
+});
+
+// The zone on/off <select> is not just a readout -- its value is baked into
+// the zone's temp/damper command URLs. A stale refresh flipping it back
+// therefore changes what the NEXT tap of the same ✓ sends, silently turning
+// the zone off after you deliberately set it on.
+test("a zone's on/off select holds the setting its command just sent even if a refresh reads stale state", async ({ page }) => {
+  await mockController(page, { staleGetSystemData: true });
+  await page.goto('/index.html');
+
+  await page.locator('[data-zone-title-name="2"]').click(); // expand zone 2's card
+  const settingSelect = page.locator('[data-zone-setting="2"]');
+  await expect(settingSelect).toHaveValue('0'); // load-time refresh reflects the unit: zone 2 is off
+
+  await settingSelect.selectOption('1');
+  const requestPromise = page.waitForRequest((req) => req.url().includes('/setZoneData') && req.url().includes('zone=2') && req.url().includes('zoneSetting=1'));
+  await page.locator('[data-zone-temp-link="2"]').click();
+  await requestPromise;
+
+  await page.waitForTimeout(1500);
+
+  await expect(settingSelect).toHaveValue('1');
+});
+
+// The grace window deliberately blocks refreshState() from correcting an
+// optimistic highlight for a few seconds. When the send is known to have
+// FAILED, though, that highlight is known-wrong, and holding the window
+// would make the one case we're certain about the one case nothing may fix.
+test('a failed command releases its grace window so the next refresh corrects the highlight', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.open = () => null; // swallow the web fallback's popup; not what this test is about
+  });
+  await mockController(page);
+  await page.goto('/index.html');
+
+  await page.route('**/proxy/setSystemData**', (route) => route.abort('failed'));
+
+  await page.locator('#link-on').click();
+  await expect(page.locator('#link-on')).not.toHaveClass(/pending/, { timeout: 3000 });
+  // Highlight went on optimistically, but the unit never got the command.
+  // Flipping auto-refresh on runs refreshState() immediately; it must be
+  // allowed to clear the highlight rather than being held off for 5s.
+  await page.locator('.zone-summary-name', { hasText: 'Live refresh' }).click(); // expand the card holding the toggle
+  await page.locator('#live-poll-toggle').check();
+  await expect(page.locator('#link-on')).not.toHaveClass(/active/, { timeout: 3000 });
+});
+
 test('connection settings persist across reload via localStorage', async ({ page }) => {
   await mockController(page);
   await page.goto('/index.html');
