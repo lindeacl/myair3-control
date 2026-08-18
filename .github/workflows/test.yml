@@ -16,6 +16,11 @@ jobs:
       - run: npm ci
       - run: npm audit --audit-level=high
       - run: node scripts/check-html-js.mjs index.html
+      # QUALITY_STANDARD.md §9: a gate isn't adopted until a deliberate
+      # violation is confirmed to be caught. Asserts the PostToolUse hook
+      # still blocks a bad index.html and still ignores files this repo
+      # doesn't own.
+      - run: scripts/test-check-after-edit.sh
       - run: npx playwright install --with-deps chromium
       - run: npx playwright test
       - run: node scripts/check-coverage.mjs
