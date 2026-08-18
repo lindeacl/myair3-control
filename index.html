@@ -431,7 +431,7 @@ function renderZones() {
         <small class="foot-status" data-zone-temp-asof="${z}">${temp.value ? 'as of last manual check' + (temp.at ? ' (' + temp.at + ')' : '') : 'no reading recorded yet'}</small>
 
         <label>Zone name (from &lt;name&gt; in Get Zone Data)</label>
-        <input type="text" value="${names[z] || ''}" placeholder="e.g. SPARE BEDROO" data-zone-name-input="${z}">
+        <input type="text" value="${names[z] || ''}" placeholder="e.g. SPARE BEDROO" data-zone-name-input="${z}" aria-label="Zone name for zone ${z}">
         <div class="note">Names over 12 characters get cut off by the unit itself &mdash; not a typo.</div>
 
         <div class="row">
@@ -439,7 +439,7 @@ function renderZones() {
         </div>
 
         <label>Current temp &mdash; paste &lt;actualTemp&gt; from Get Zone Data (0.0 usually = no sensor)</label>
-        <input type="text" inputmode="decimal" value="${temp.value || ''}" placeholder="e.g. 21.5" data-zone-actualtemp-input="${z}">
+        <input type="text" inputmode="decimal" value="${temp.value || ''}" placeholder="e.g. 21.5" data-zone-actualtemp-input="${z}" aria-label="Current temperature for zone ${z}">
 
         <label>Desired temp (°C)</label>
         <div class="row">
