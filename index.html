@@ -45,16 +45,16 @@
     color: var(--text);
   }
 
-  header { margin-bottom: 14px; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  header { margin-bottom: 18px; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
   h1 { font-size: 21px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
   .sub { color: var(--muted); font-size: 12.5px; margin: 2px 0 0; }
 
   .card {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 14px;
-    margin-bottom: 12px;
+    border-radius: 18px;
+    padding: 18px;
+    margin-bottom: 14px;
   }
   .card-title {
     font-size: 12px;
@@ -67,71 +67,62 @@
     align-items: center;
     gap: 6px;
   }
+  .card-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+  .card-value { font-size: 13.5px; font-weight: 700; color: var(--accent); }
 
-  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.06em; }
   label:first-of-type { margin-top: 0; }
   input[type="text"], input[type="number"], input:not([type]), select {
     width: 100%;
     box-sizing: border-box;
-    padding: 10px 11px;
-    border-radius: 10px;
+    padding: 12px 13px;
+    border-radius: 12px;
     border: 1px solid var(--border);
     background: var(--card-2);
     color: var(--text);
     font-size: 15px;
+    font-family: inherit;
   }
-  input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0; }
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 8px; border-radius: 6px; margin: 10px 0 0;
+    background: var(--card-2); border: 1px solid var(--border);
+  }
+  input[type="range"]::-webkit-slider-runnable-track { height: 8px; border-radius: 6px; background: transparent; }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+    background: #fff; border: 3px solid var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    margin-top: -8px; cursor: pointer;
+  }
+  input[type="range"]::-moz-range-track { height: 8px; border-radius: 6px; background: transparent; }
+  input[type="range"]::-moz-range-thumb {
+    width: 22px; height: 22px; border-radius: 50%; background: #fff;
+    border: 3px solid var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,0.4); cursor: pointer;
+  }
   input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* Visually-hidden but still test/automation-actionable: opacity keeps a
+     real hit-testable layout box (unlike display:none), so .fill() and a
+     dispatched 'input' event both still work -- only the pixel is invisible.
+     The big dial digits are what a person actually reads; these inputs stay
+     the real source of truth the rest of the app's logic already keys off. */
+  .visually-hidden-input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+  }
 
   .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
   .row:first-child { margin-top: 0; }
-  .row.wrap { flex-wrap: wrap; }
   .grow { flex: 1 1 auto; min-width: 0; }
 
-  /* Segmented / pill controls -- built from the same <a class="cmd"> links the
-     JS already knows how to send + highlight; this just changes how they look. */
-  .seg {
-    display: flex;
-    background: var(--card-2);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 3px;
-    gap: 3px;
-  }
-  .seg a.pill {
-    flex: 1;
-    text-align: center;
-    padding: 9px 6px;
-    border-radius: 9px;
-    text-decoration: none;
-    color: var(--muted);
-    font-size: 13.5px;
-    font-weight: 600;
-    transition: background 0.15s, color 0.15s;
-  }
-  .seg a.pill.active { background: var(--accent); color: #fff; }
-  .seg.danger-seg a.pill.active { background: var(--danger); }
-
-  a.pill.standalone {
-    display: block;
-    text-align: center;
-    padding: 10px;
-    border-radius: 10px;
-    background: var(--card-2);
-    border: 1px solid var(--border);
-    color: var(--muted);
-    text-decoration: none;
-    font-size: 13.5px;
-    font-weight: 600;
-  }
-  a.pill.standalone.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
-
-  /* icon buttons: stepper +/- and the checkmark "Set"/"confirm" action */
   button.icon-btn, a.icon-btn {
     flex: 0 0 auto;
     width: 38px;
     height: 38px;
-    border-radius: 10px;
+    border-radius: 12px;
     border: 1px solid var(--border);
     background: var(--card-2);
     color: var(--text);
@@ -141,15 +132,11 @@
     justify-content: center;
     text-decoration: none;
     -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+    padding: 0;
   }
   a.icon-btn.confirm { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 
-  /* Circular nav buttons (open/close Settings) -- visually distinct from the
-     square-ish icon-btn steppers so navigation chrome reads differently
-     from in-content controls. Plain <button>, not <a>, on purpose: this
-     project has already shipped the "anchor falls through to raw
-     navigation" bug twice (zone On/Off, command buttons) -- a button has
-     no default navigation behavior to fall through to. */
   button.nav-btn {
     width: 38px;
     height: 38px;
@@ -168,41 +155,114 @@
   .cmd.pending { opacity: 0.5; }
   .cmd.sent { box-shadow: 0 0 0 2px var(--success); }
 
-  .stat-line { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; }
-  .stat-line .big { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
-  .stat-line .label { font-size: 12px; color: var(--muted); }
   .note { color: var(--muted); font-size: 11.5px; margin-top: 6px; line-height: 1.4; }
+  .caption { color: var(--muted); font-size: 11.5px; line-height: 1.4; margin-top: 8px; }
+  small.foot-status { color: var(--muted); font-size: 11.5px; display: block; margin-top: 8px; line-height: 1.4; }
 
-  /* details/summary used for the collapsible Live refresh panel + each zone card */
-  details { border: 1px solid var(--border); border-radius: 16px; background: var(--card); margin-bottom: 12px; overflow: hidden; }
-  details > summary {
-    list-style: none;
-    cursor: pointer;
-    padding: 13px 14px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    -webkit-tap-highlight-color: transparent;
-  }
-  details > summary::-webkit-details-marker { display: none; }
-  details > summary .chev { margin-left: auto; color: var(--muted); font-size: 13px; transition: transform 0.15s; }
-  details[open] > summary .chev { transform: rotate(90deg); }
-  details > .details-body { padding: 0 14px 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+  svg.i { width: 20px; height: 20px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  svg.i-sm { width: 16px; height: 16px; }
 
-  .zone-summary-name { font-weight: 600; font-size: 14.5px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .zone-temp-badge { color: var(--accent); font-weight: 700; font-size: 13.5px; }
-  .zone-onoff { display: flex; gap: 4px; background: var(--card-2); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
-  .zone-onoff a { padding: 5px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 700; text-decoration: none; color: var(--muted); }
-  .zone-onoff a.active { background: var(--accent); color: #fff; }
-  .zone-onoff a.off.active { background: var(--danger); }
-
-  .switch-row { display: flex; align-items: center; justify-content: space-between; }
+  /* ---- Power switch: compact two-pill, sits above each dial ---- */
+  .power-row { display: flex; justify-content: center; margin-bottom: 16px; }
   .switch-track { display: flex; background: var(--card-2); border: 1px solid var(--border); border-radius: 12px; padding: 3px; width: 132px; }
   .switch-track a { flex: 1; text-align: center; padding: 8px 4px; border-radius: 9px; text-decoration: none; color: var(--muted); font-size: 12.5px; font-weight: 700; }
   .switch-track a.active { background: var(--accent); color: #fff; }
   .switch-track a.off.active { background: var(--danger); }
 
-  small.foot-status { color: var(--muted); font-size: 11.5px; display: block; margin-top: 8px; line-height: 1.4; }
+  /* ---- Dial (shared by the central control and Zone Detail) ---- */
+  .dial-wrap { position: relative; width: 246px; height: 246px; margin: 0 auto 16px; }
+  .dial-ring-svg { position: absolute; inset: 0; transform: rotate(-90deg); pointer-events: none; }
+  .dial-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+  .dial-temp { font-size: 52px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+  .dial-unit { font-size: 20px; color: var(--muted); font-weight: 600; }
+  .dial-caption { color: var(--muted); font-size: 11.5px; text-align: center; padding: 0 24px; line-height: 1.4; margin-bottom: 16px; }
+  .dial-edge {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 40px; height: 40px; border-radius: 50%; background: var(--card-2);
+    border: 1px solid var(--border); color: var(--text);
+    display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+  }
+  .dial-edge.minus { left: -6px; }
+  .dial-edge.plus { right: -6px; }
+
+  /* ---- Mode circles ---- */
+  .mode-row { display: flex; justify-content: center; gap: 14px; margin-bottom: 18px; }
+  .mode-circle {
+    width: 60px; height: 60px; border-radius: 50%; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 3px; cursor: pointer;
+    background: var(--card-2); border: 1px solid var(--border); color: var(--muted);
+    text-decoration: none;
+  }
+  .mode-circle.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .mode-circle span { font-size: 10px; font-weight: 700; }
+
+  /* ---- Fan strip ---- */
+  .fan-strip {
+    display: flex; align-items: center; gap: 10px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; margin-bottom: 8px;
+  }
+  .fan-strip .fan-label { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; flex: 1; }
+  .mini-step { width: 32px; height: 32px; border-radius: 10px; background: var(--card-2); border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; padding: 0; }
+  .fan-count { font-size: 15px; font-weight: 700; width: 16px; text-align: center; }
+  a.auto-chip {
+    padding: 8px 12px; border-radius: 10px; background: var(--card-2); border: 1px solid var(--border);
+    color: var(--muted); font-size: 12.5px; font-weight: 700; cursor: pointer; text-decoration: none; flex: 0 0 auto;
+  }
+  a.auto-chip.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+  /* ---- Zone tiles ---- */
+  .zones-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 10px; }
+  .zone-scroll { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x proximity; padding: 2px 2px 10px; margin-bottom: 14px; }
+  .zone-tile {
+    flex: 0 0 112px; border-radius: 16px; padding: 14px 12px;
+    background: var(--card); border: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px;
+    scroll-snap-align: start;
+  }
+  .zone-tile.on { background: var(--accent); border-color: var(--accent); }
+  .zone-tile-main { cursor: pointer; display: flex; flex-direction: column; gap: 12px; }
+  .zone-tile-icon { width: 28px; height: 28px; border-radius: 9px; background: var(--card-2); display: flex; align-items: center; justify-content: center; color: var(--muted); flex: 0 0 auto; }
+  .zone-tile.on .zone-tile-icon { background: rgba(255,255,255,0.2); color: #fff; }
+  .zone-tile-name { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .zone-tile.on .zone-tile-name { color: #fff; }
+  .zone-tile-temp { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .zone-tile.on .zone-tile-temp { color: rgba(255,255,255,0.85); }
+  .zone-onoff { display: flex; gap: 4px; background: var(--card-2); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
+  .zone-tile.on .zone-onoff { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.3); }
+  .zone-onoff a { padding: 5px 6px; border-radius: 6px; font-size: 10.5px; font-weight: 700; text-decoration: none; color: var(--muted); flex: 1; text-align: center; }
+  .zone-tile.on .zone-onoff a { color: rgba(255,255,255,0.7); }
+  .zone-onoff a.active { background: var(--accent); color: #fff; }
+  .zone-onoff a.off.active { background: var(--danger); }
+
+  /* ---- Back-row header (Settings + Zone Detail) ---- */
+  .back-row { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .back-row h1 { font-size: 19px; }
+
+  /* ---- Stat cards (Zone Detail) ---- */
+  .stat-row { display: flex; gap: 10px; margin-bottom: 14px; }
+  .stat-card { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 4px; }
+  .stat-label { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+  .stat-value { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+  .stat-value.state-on { color: var(--accent); }
+  .stat-value.state-off { color: var(--muted); }
+
+  a.diag-row {
+    display: flex; align-items: center; gap: 8px; padding: 13px 14px;
+    color: var(--text); cursor: pointer; text-decoration: none;
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px; margin-bottom: 14px;
+  }
+  a.diag-row span { flex: 1; font-size: 13.5px; font-weight: 600; }
+
+  /* ---- Toggle switch (Settings: live refresh) ---- */
+  .switch-row2 { display: flex; align-items: center; gap: 12px; }
+  .switch-label { flex: 1; font-size: 14.5px; font-weight: 600; }
+  .toggle-track {
+    width: 46px; height: 26px; border-radius: 13px; background: var(--card-2);
+    border: 1px solid var(--border); position: relative; flex: 0 0 auto;
+  }
+  .toggle-track.on { background: var(--accent); border-color: var(--accent); }
+  .toggle-knob { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform 0.15s; pointer-events: none; }
+  .toggle-track.on .toggle-knob { transform: translateX(20px); }
+  .toggle-input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
 
   #install-banner {
     display: none;
@@ -251,79 +311,150 @@
   </button>
 </header>
 
-<div class="card">
-  <div class="card-title">⏻ System</div>
-
-  <div class="switch-row">
-    <div class="label" style="color:var(--muted); font-size:13px;">Power</div>
-    <div class="switch-track">
-      <a class="cmd off" id="link-off" href="#" target="_blank" rel="noopener">Off</a>
-      <a class="cmd" id="link-on" href="#" target="_blank" rel="noopener">On</a>
-    </div>
+<div class="power-row">
+  <div class="switch-track">
+    <a class="cmd off" id="link-off" href="#" target="_blank" rel="noopener">Off</a>
+    <a class="cmd" id="link-on" href="#" target="_blank" rel="noopener">On</a>
   </div>
+</div>
 
-  <div class="stat-line">
+<div class="dial-wrap">
+  <svg class="dial-ring-svg" width="246" height="246" viewBox="0 0 246 246">
+    <circle cx="123" cy="123" r="104" fill="none" stroke="#2a2a34" stroke-width="14"/>
+    <circle id="dial-ring" cx="123" cy="123" r="104" fill="none" stroke="#2a2a34" stroke-width="14" stroke-linecap="round" stroke-dasharray="653.5" stroke-dashoffset="653.5"/>
+  </svg>
+  <button type="button" class="dial-edge minus" data-step-target="#centralTemp" data-step-delta="-0.5" aria-label="Decrease desired temperature">
+    <svg class="i i-sm" viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
+  </button>
+  <button type="button" class="dial-edge plus" data-step-target="#centralTemp" data-step-delta="0.5" aria-label="Increase desired temperature">
+    <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+  <div class="dial-center">
+    <div class="dial-temp" id="central-temp-display">22.0<span class="dial-unit">°</span></div>
+    <a class="icon-btn confirm cmd" id="link-temp" href="#" target="_blank" rel="noopener" aria-label="Set desired temperature">✓</a>
+  </div>
+</div>
+<input id="centralTemp" type="number" step="0.5" min="16" max="30" value="22" class="visually-hidden-input" aria-label="Desired temperature">
+<div class="dial-caption" id="central-state-note">Not read yet — will refresh automatically.</div>
+
+<div class="mode-row">
+  <a class="mode-circle cmd" id="link-mode-1" href="#" target="_blank" rel="noopener">
+    <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 2v20M4.2 6.5l15.6 11M4.2 17.5l15.6-11"/></svg>
+    <span>Cool</span>
+  </a>
+  <a class="mode-circle cmd" id="link-mode-2" href="#" target="_blank" rel="noopener">
+    <svg class="i i-sm" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+    <span>Heat</span>
+  </a>
+  <a class="mode-circle cmd" id="link-mode-3" href="#" target="_blank" rel="noopener">
+    <svg class="i i-sm" viewBox="0 0 24 24"><path d="M9.6 4.6A2 2 0 1 1 11 8H2M12.6 19.4A2 2 0 1 0 14 16H2M17.7 7.7A2.5 2.5 0 1 1 19.5 12H2"/></svg>
+    <span>Fan</span>
+  </a>
+</div>
+
+<div class="fan-strip">
+  <div class="fan-label">Fan</div>
+  <button type="button" class="mini-step" data-step-target="#fanSpeed" data-step-delta="-1" aria-label="Decrease fan speed">
+    <svg class="i i-sm" viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
+  </button>
+  <div class="fan-count" id="fan-speed-display">2</div>
+  <button type="button" class="mini-step" data-step-target="#fanSpeed" data-step-delta="1" aria-label="Increase fan speed">
+    <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+  <a class="icon-btn confirm cmd" id="link-fan" href="#" target="_blank" rel="noopener" aria-label="Set fan speed">✓</a>
+  <a class="auto-chip cmd" id="link-fan-auto" href="#" target="_blank" rel="noopener">✨ Auto</a>
+</div>
+<input id="fanSpeed" type="number" min="1" max="4" value="2" class="visually-hidden-input" aria-label="Fan speed">
+<div class="note" style="margin-top:-2px; margin-bottom:16px;">Auto sends <code>fanSpeed=auto</code>, unverified on this unit &mdash; check the raw XML if it doesn't take effect.</div>
+
+<div>
+  <div class="zones-title">Zones</div>
+  <div class="zone-scroll" id="zone-container"></div>
+</div>
+</div>
+
+<div id="zone-view" style="display:none;">
+  <div class="back-row">
+    <button type="button" class="nav-btn" id="zone-back" aria-label="Back">
+      <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
     <div>
-      <div class="big" id="central-temp-display">22.0°</div>
-      <div class="label">Desired temp</div>
-    </div>
-    <div class="row" style="margin-top:0;">
-      <button type="button" class="icon-btn" data-step-target="#centralTemp" data-step-delta="-0.5" aria-label="Decrease desired temperature">−</button>
-      <input id="centralTemp" type="number" step="0.5" min="16" max="30" value="22" style="width:64px; text-align:center;" aria-label="Desired temperature">
-      <button type="button" class="icon-btn" data-step-target="#centralTemp" data-step-delta="0.5" aria-label="Increase desired temperature">+</button>
-      <a class="icon-btn confirm cmd" id="link-temp" href="#" target="_blank" rel="noopener" aria-label="Set desired temperature">✓</a>
+      <h1 id="zone-view-name">Zone</h1>
+      <div class="sub" id="zone-view-sub">Zone</div>
     </div>
   </div>
 
-  <label>Mode</label>
-  <div class="seg">
-    <a class="pill cmd" id="link-mode-1" href="#" target="_blank" rel="noopener">❄️ Cool</a>
-    <a class="pill cmd" id="link-mode-2" href="#" target="_blank" rel="noopener">🔥 Heat</a>
-    <a class="pill cmd" id="link-mode-3" href="#" target="_blank" rel="noopener">🌀 Fan</a>
-  </div>
-
-  <label>Fan speed</label>
-  <div class="row">
-    <button type="button" class="icon-btn" data-step-target="#fanSpeed" data-step-delta="-1" aria-label="Decrease fan speed">−</button>
-    <input id="fanSpeed" type="number" min="1" max="4" value="2" style="width:64px; text-align:center;" aria-label="Fan speed">
-    <button type="button" class="icon-btn" data-step-target="#fanSpeed" data-step-delta="1" aria-label="Increase fan speed">+</button>
-    <a class="icon-btn confirm cmd" id="link-fan" href="#" target="_blank" rel="noopener" aria-label="Set fan speed">✓</a>
-    <a class="pill standalone cmd grow" id="link-fan-auto" href="#" target="_blank" rel="noopener">✨ Auto</a>
-  </div>
-  <div class="note">Auto sends <code>fanSpeed=auto</code>, unverified on this unit &mdash; check the raw XML if it doesn't take effect.</div>
-
-  <small class="foot-status" id="central-state-note">Not read yet — will refresh automatically.</small>
-</div>
-
-<div class="card">
-  <div class="card-title">🏠 Zones</div>
-  <div id="zone-container"></div>
-</div>
-
-<details>
-  <summary><span>📡</span><span class="zone-summary-name">Live refresh</span><span class="chev">›</span></summary>
-  <div class="details-body">
-    <div class="row" style="align-items:center;">
-      <label style="display:flex; align-items:center; gap:8px; margin:0; flex:1; font-size:13px; color:var(--text);">
-        <input type="checkbox" id="live-poll-toggle" style="width:auto; margin:0;">
-        Keep auto-refreshing every 15s
-      </label>
+  <div class="dial-wrap">
+    <svg class="dial-ring-svg" width="246" height="246" viewBox="0 0 246 246">
+      <circle cx="123" cy="123" r="104" fill="none" stroke="#2a2a34" stroke-width="14"/>
+      <circle id="zone-dial-ring" cx="123" cy="123" r="104" fill="none" stroke="#2a2a34" stroke-width="14" stroke-linecap="round" stroke-dasharray="653.5" stroke-dashoffset="653.5"/>
+    </svg>
+    <button type="button" class="dial-edge minus" data-step-target="[data-zone-temp-input]" data-step-delta="-0.5" aria-label="Decrease zone desired temperature">
+      <svg class="i i-sm" viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
+    </button>
+    <button type="button" class="dial-edge plus" data-step-target="[data-zone-temp-input]" data-step-delta="0.5" aria-label="Increase zone desired temperature">
+      <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <div class="dial-center">
+      <div class="dial-temp" id="zone-temp-display">22.0<span class="dial-unit">°</span></div>
+      <a class="icon-btn confirm cmd" data-zone-temp-link="" href="#" target="_blank" rel="noopener" aria-label="Set zone desired temperature">✓</a>
     </div>
-    <div class="note">Otherwise it refreshes once on open and whenever you return to this screen.</div>
-    <small class="foot-status" id="live-poll-status">Reading current state…</small>
   </div>
-</details>
+  <input type="number" step="0.5" min="16" max="30" value="22" data-zone-temp-input="" class="visually-hidden-input" aria-label="Zone desired temperature">
+
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-label">Actual temp</div>
+      <div class="stat-value" id="zone-actual-temp-display">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Zone state</div>
+      <div class="stat-value" id="zone-state-display">—</div>
+    </div>
+  </div>
+
+  <label>Actual temp &mdash; paste &lt;actualTemp&gt; from Get Zone Data (0.0 usually = no sensor)</label>
+  <input type="text" inputmode="decimal" data-zone-actualtemp-input="" placeholder="e.g. 21.5" aria-label="Manually entered actual temperature">
+  <small class="foot-status" id="zone-temp-asof">no reading recorded yet</small>
+
+  <div class="card" style="margin-top:14px;">
+    <div class="card-head">
+      <div class="card-title" style="margin:0;">Damper open</div>
+      <div class="card-value" id="zone-percent-display-val">80%</div>
+    </div>
+    <input type="range" min="0" max="100" step="5" value="80" data-zone-percent-input="" data-range-label="#zone-percent-display-val" aria-label="Damper percentage">
+    <div class="row" style="justify-content:flex-end; margin-top:12px;">
+      <a class="icon-btn confirm cmd" data-zone-percent-link="" href="#" target="_blank" rel="noopener" aria-label="Set damper percentage">✓</a>
+    </div>
+    <div class="caption">For zones without a temperature sensor.</div>
+  </div>
+
+  <div class="row" style="margin-bottom:14px;">
+    <label style="flex:1; margin:0;">Zone setting (used by the ✓ buttons above)</label>
+    <select data-zone-setting="" style="flex:0 0 90px;" aria-label="On/off setting sent with zone commands">
+      <option value="1">On</option>
+      <option value="0">Off</option>
+    </select>
+  </div>
+
+  <label>Zone name (from &lt;name&gt; in Get Zone Data)</label>
+  <input type="text" data-zone-name-input="" placeholder="e.g. SPARE BEDROO" aria-label="Zone name">
+  <div class="caption" style="margin-bottom:14px;">Names over 12 characters get cut off by the unit itself &mdash; not a typo.</div>
+
+  <a class="diag-row data" data-zone-data="" href="#" target="_blank" rel="noopener">
+    <svg class="i i-sm" viewBox="0 0 24 24"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
+    <span>Get Zone Data (raw)</span>
+    <svg class="i i-sm" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+  </a>
 </div>
 
 <div id="settings-view" style="display:none;">
-  <header style="margin-bottom:14px;">
-    <div class="row" style="align-items:center; gap:12px; margin-top:0;">
-      <button type="button" class="nav-btn" id="settings-close" aria-label="Back">
-        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
-      </button>
-      <h1>Settings</h1>
-    </div>
-  </header>
+  <div class="back-row">
+    <button type="button" class="nav-btn" id="settings-close" aria-label="Back">
+      <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
+    <h1>Settings</h1>
+  </div>
 
   <div class="card">
     <div class="card-title">Connection</div>
@@ -335,10 +466,22 @@
     <input id="password" value="password">
     <label for="zones">Number of zones</label>
     <input id="zones" type="number" min="1" max="16" value="3">
-    <div class="row">
-      <a class="pill standalone data grow" id="link-status" href="#" target="_blank" rel="noopener">Get System Data</a>
-      <a class="pill standalone data grow" id="link-login" href="#" target="_blank" rel="noopener">Login</a>
+    <div class="row" style="margin-top:14px;">
+      <a class="icon-btn confirm data cmd-like grow" id="link-status" href="#" target="_blank" rel="noopener" style="width:auto; border-radius:12px; padding:11px;">Get System Data</a>
+      <a class="icon-btn confirm data cmd-like grow" id="link-login" href="#" target="_blank" rel="noopener" style="width:auto; border-radius:12px; padding:11px;">Login</a>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Live Refresh</div>
+    <div class="switch-row2">
+      <div class="switch-label">Keep auto-refreshing every 15s</div>
+      <div class="toggle-track" id="live-poll-track">
+        <input type="checkbox" id="live-poll-toggle" class="toggle-input" aria-label="Keep auto-refreshing every 15 seconds">
+        <div class="toggle-knob"></div>
+      </div>
+    </div>
+    <small class="foot-status" id="live-poll-status">Reading current state…</small>
   </div>
 </div>
 
@@ -410,6 +553,46 @@ function haptic(kind) {
   } catch (e) {}
 }
 
+// Cool blue at the low end, through green, to warm red at the high end --
+// the dial ring recolors live as the target temp is adjusted. Shared by the
+// central dial and every Zone Detail dial.
+function tempToColor(t) {
+  const stops = [
+    [16, 59, 130, 246],
+    [23, 34, 197, 94],
+    [30, 239, 68, 68],
+  ];
+  const clamped = Math.min(30, Math.max(16, t));
+  let lo = stops[0], hi = stops[stops.length - 1];
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (clamped >= stops[i][0] && clamped <= stops[i + 1][0]) { lo = stops[i]; hi = stops[i + 1]; break; }
+  }
+  const f = (clamped - lo[0]) / (hi[0] - lo[0] || 1);
+  const r = Math.round(lo[1] + (hi[1] - lo[1]) * f);
+  const g = Math.round(lo[2] + (hi[2] - lo[2]) * f);
+  const b = Math.round(lo[3] + (hi[3] - lo[3]) * f);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+const DIAL_CIRCUMFERENCE = 653.5;
+// Which zone (string id, e.g. "2") Zone Detail is currently showing, or null
+// when that screen isn't open. The reusable data-zone-* fields inside
+// #zone-view are re-pointed to this id by openZoneDetail() -- everywhere
+// else in this file that already queries by data-zone-*="Z" (updateLinks(),
+// refreshState(), getAssociatedInputs()) keeps working completely unchanged,
+// since there's simply one matching element instead of N. Declared this
+// early because renderZones()/updateLinks() already run during initial page
+// load, before the rest of the live-polling section below is reached.
+let openZoneId = null;
+function updateDialRing(ringId, temp, isOn) {
+  const ring = document.getElementById(ringId);
+  if (!ring) return;
+  const t = Math.min(30, Math.max(16, parseFloat(temp) || 22));
+  const fraction = isOn ? (t - 16) / 14 : 0;
+  const offset = Math.round(DIAL_CIRCUMFERENCE * (1 - fraction) * 100) / 100;
+  ring.setAttribute('stroke-dashoffset', String(offset));
+  ring.setAttribute('stroke', isOn ? tempToColor(t) : '#2a2a34');
+}
+
 const DEFAULT_ZONE_NAMES = { 1: 'MAIN BEDROOM', 2: 'TK BEDROOM', 3: 'SPARE BEDROO' };
 
 function loadZoneNames() {
@@ -451,51 +634,24 @@ function renderZones() {
   for (let z = 1; z <= n; z++) {
     const zoneName = names[z] || ('Zone ' + z);
     const temp = temps[z] || {};
-    const details = document.createElement('details');
-    details.innerHTML = `
-      <summary>
-        <span class="zone-summary-name" data-zone-title-name="${z}">${zoneName}</span>
-        <span class="zone-temp-badge" data-zone-title-temp="${z}">${temp.value ? temp.value + '°C' : ''}</span>
-        <span class="zone-onoff">
-          <a class="cmd off" data-zone-off="${z}" href="#" target="_blank" rel="noopener" onclick="event.preventDefault()">Off</a>
-          <a class="cmd" data-zone-on="${z}" href="#" target="_blank" rel="noopener" onclick="event.preventDefault()">On</a>
-        </span>
-        <span class="chev">›</span>
-      </summary>
-      <div class="details-body">
-        <small class="foot-status" data-zone-temp-asof="${z}">${temp.value ? 'as of last manual check' + (temp.at ? ' (' + temp.at + ')' : '') : 'no reading recorded yet'}</small>
-
-        <label>Zone name (from &lt;name&gt; in Get Zone Data)</label>
-        <input type="text" value="${names[z] || ''}" placeholder="e.g. SPARE BEDROO" data-zone-name-input="${z}" aria-label="Zone name for zone ${z}">
-        <div class="note">Names over 12 characters get cut off by the unit itself &mdash; not a typo.</div>
-
-        <div class="row">
-          <a class="pill standalone data grow" data-zone-data="${z}" href="#" target="_blank" rel="noopener">Get Zone Data</a>
+    const tile = document.createElement('div');
+    tile.className = 'zone-tile';
+    tile.innerHTML = `
+      <div class="zone-tile-main" data-zone-open="${z}" role="button" tabindex="0" aria-label="Open zone ${z} details">
+        <div class="zone-tile-icon">
+          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 2v10"/><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/></svg>
         </div>
-
-        <label>Current temp &mdash; paste &lt;actualTemp&gt; from Get Zone Data (0.0 usually = no sensor)</label>
-        <input type="text" inputmode="decimal" value="${temp.value || ''}" placeholder="e.g. 21.5" data-zone-actualtemp-input="${z}" aria-label="Current temperature for zone ${z}">
-
-        <label>Desired temp (°C)</label>
-        <div class="row">
-          <button type="button" class="icon-btn" data-step-target="[data-zone-temp-input='${z}']" data-step-delta="-0.5" aria-label="Decrease temperature for zone ${z}">−</button>
-          <input type="number" step="0.5" min="16" max="30" value="22" data-zone-temp-input="${z}" style="width:64px; text-align:center;" aria-label="Desired temperature for zone ${z}">
-          <button type="button" class="icon-btn" data-step-target="[data-zone-temp-input='${z}']" data-step-delta="0.5" aria-label="Increase temperature for zone ${z}">+</button>
-          <select data-zone-setting="${z}" style="flex:0 0 72px;" aria-label="On/off for zone ${z}">
-            <option value="1">On</option>
-            <option value="0">Off</option>
-          </select>
-          <a class="icon-btn confirm cmd" data-zone-temp-link="${z}" href="#" target="_blank" rel="noopener" aria-label="Set temperature for zone ${z}">✓</a>
-        </div>
-
-        <label>Damper open % <span data-zone-percent-display="${z}">80%</span> <span style="font-weight:400; color:var(--muted);">(for zones without a temperature sensor)</span></label>
-        <div class="row">
-          <input type="range" min="0" max="100" step="5" value="80" data-zone-percent-input="${z}" data-range-label="[data-zone-percent-display='${z}']" class="grow" aria-label="Damper percentage for zone ${z}">
-          <a class="icon-btn confirm cmd" data-zone-percent-link="${z}" href="#" target="_blank" rel="noopener" aria-label="Set damper percentage for zone ${z}">✓</a>
+        <div>
+          <div class="zone-tile-name" data-zone-title-name="${z}">${zoneName}</div>
+          <div class="zone-tile-temp" data-zone-title-temp="${z}">${temp.value ? temp.value + '°C' : 'No reading'}</div>
         </div>
       </div>
+      <span class="zone-onoff">
+        <a class="cmd off" data-zone-off="${z}" href="#" target="_blank" rel="noopener" onclick="event.preventDefault()">Off</a>
+        <a class="cmd" data-zone-on="${z}" href="#" target="_blank" rel="noopener" onclick="event.preventDefault()">On</a>
+      </span>
     `;
-    container.appendChild(details);
+    container.appendChild(tile);
   }
   updateLinks();
 }
@@ -517,14 +673,19 @@ function updateLinks() {
   const fanSpeed = document.getElementById('fanSpeed').value;
   document.getElementById('link-fan').href = `${b}/setSystemData?fanSpeed=${encodeURIComponent(fanSpeed)}`;
   document.getElementById('link-fan-auto').href = `${b}/setSystemData?fanSpeed=auto`;
+  const fanDisplay = document.getElementById('fan-speed-display');
+  if (fanDisplay) fanDisplay.textContent = fanSpeed;
 
   const centralTemp = document.getElementById('centralTemp').value;
   document.getElementById('link-temp').href = `${b}/setSystemData?centralDesiredTemp=${encodeURIComponent(centralTemp)}`;
   const centralDisplay = document.getElementById('central-temp-display');
-  if (centralDisplay) centralDisplay.textContent = (parseFloat(centralTemp) || 0).toFixed(1) + '°';
+  const centralTempNum = (parseFloat(centralTemp) || 0).toFixed(1);
+  if (centralDisplay) centralDisplay.innerHTML = centralTempNum + '<span class="dial-unit">°</span>';
+  updateDialRing('dial-ring', centralTemp, document.getElementById('link-on').classList.contains('active'));
 
   document.querySelectorAll('[data-zone-data]').forEach(a => {
     const z = a.getAttribute('data-zone-data');
+    if (!z) return;
     a.href = `${b}/getZoneData?zone=${z}`;
   });
   document.querySelectorAll('[data-zone-on]').forEach(a => {
@@ -537,16 +698,32 @@ function updateLinks() {
   });
   document.querySelectorAll('[data-zone-temp-link]').forEach(a => {
     const z = a.getAttribute('data-zone-temp-link');
+    if (!z) return;
     const temp = document.querySelector(`[data-zone-temp-input="${z}"]`).value;
     const setting = document.querySelector(`[data-zone-setting="${z}"]`).value;
     a.href = `${b}/setZoneData?zone=${z}&desiredTemp=${encodeURIComponent(temp)}&zoneSetting=${setting}`;
   });
   document.querySelectorAll('[data-zone-percent-link]').forEach(a => {
     const z = a.getAttribute('data-zone-percent-link');
+    if (!z) return;
     const percent = document.querySelector(`[data-zone-percent-input="${z}"]`).value;
     const setting = document.querySelector(`[data-zone-setting="${z}"]`).value;
     a.href = `${b}/setZoneData?zone=${z}&userPercentSetting=${encodeURIComponent(percent)}&zoneSetting=${setting}`;
   });
+
+  // Mirror whichever zone is currently open in Zone Detail -- the dial digits
+  // and ring aren't a generic data-zone-* query like the hrefs above, so they
+  // need an explicit sync here (same idea as the central dial two lines up).
+  if (openZoneId !== null) {
+    const zTempInput = document.querySelector('[data-zone-temp-input]');
+    const zDisplay = document.getElementById('zone-temp-display');
+    if (zTempInput && zDisplay) {
+      const zTempNum = (parseFloat(zTempInput.value) || 0).toFixed(1);
+      zDisplay.innerHTML = zTempNum + '<span class="dial-unit">°</span>';
+      const setting = document.querySelector('[data-zone-setting]');
+      updateDialRing('zone-dial-ring', zTempInput.value, !!setting && setting.value === '1');
+    }
+  }
 }
 
 document.addEventListener('input', (e) => {
@@ -555,6 +732,8 @@ document.addEventListener('input', (e) => {
     saveZoneName(nameZ, e.target.value);
     const titleSpan = document.querySelector(`[data-zone-title-name="${nameZ}"]`);
     if (titleSpan) titleSpan.textContent = e.target.value || ('Zone ' + nameZ);
+    const viewName = document.getElementById('zone-view-name');
+    if (viewName && String(nameZ) === String(openZoneId)) viewName.textContent = e.target.value || ('Zone ' + nameZ);
   }
   const tempZ = e.target.getAttribute && e.target.getAttribute('data-zone-actualtemp-input');
   if (tempZ) {
@@ -589,15 +768,29 @@ document.addEventListener('click', (e) => {
   input.dispatchEvent(new Event('input', { bubbles: true }));
 });
 
-// Light haptic when expanding/collapsing a <details> card (Live refresh,
-// each zone -- Connection is no longer one of these; it moved to its own
-// Settings screen). Skips clicks on a .cmd element inside the summary (the zone
-// On/Off pills) since those already get their own haptic from the .cmd
-// listener below -- without this guard, tapping On/Off would double-buzz.
+// Tapping a zone tile's icon/name/temp area opens its Zone Detail screen.
+// The on/off pills are a sibling of this wrapper (not nested inside it), so
+// tapping them never reaches this handler -- no navigation on that tap,
+// matching the dashboard's "instant toggle, no navigation" contract.
 document.addEventListener('click', (e) => {
-  if (e.target.closest('a.cmd')) return;
-  if (!e.target.closest('summary')) return;
+  const openTarget = e.target.closest('[data-zone-open]');
+  if (!openTarget) return;
   haptic('light');
+  openZoneDetail(openTarget.getAttribute('data-zone-open'));
+});
+
+// Keyboard equivalent of the click handler above. The <details><summary>
+// this tile replaced was natively focusable and operable via Enter; a plain
+// <div> (now role="button" tabindex="0" -- see renderZones()) isn't, so
+// without this a keyboard or screen-reader user could no longer open Zone
+// Detail at all.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const openTarget = e.target.closest && e.target.closest('[data-zone-open]');
+  if (!openTarget) return;
+  e.preventDefault();
+  haptic('light');
+  openZoneDetail(openTarget.getAttribute('data-zone-open'));
 });
 
 loadConnSettings();
@@ -606,15 +799,20 @@ renderZones();
 // ---- shared zone-temp display update (used by both manual paste and live poll) ----
 function updateZoneTempUI(z, value, source) {
   const badge = document.querySelector(`[data-zone-title-temp="${z}"]`);
-  const asof = document.querySelector(`[data-zone-temp-asof="${z}"]`);
   const input = document.querySelector(`[data-zone-actualtemp-input="${z}"]`);
-  if (badge) badge.textContent = value ? value + '°C' : '';
-  if (asof) {
-    if (!value) asof.textContent = 'no reading recorded yet';
-    else if (source === 'live') asof.textContent = 'live (updated ' + new Date().toLocaleTimeString() + ')';
-    else asof.textContent = 'as of last manual check';
-  }
+  if (badge) badge.textContent = value ? value + '°C' : 'No reading';
   if (input && source === 'live' && document.activeElement !== input) input.value = value;
+
+  if (String(z) === String(openZoneId)) {
+    const actualDisplay = document.getElementById('zone-actual-temp-display');
+    if (actualDisplay) actualDisplay.textContent = value ? value + '°C' : '?°C';
+    const asof = document.getElementById('zone-temp-asof');
+    if (asof) {
+      if (!value) asof.textContent = 'no reading recorded yet';
+      else if (source === 'live') asof.textContent = 'live (updated ' + new Date().toLocaleTimeString() + ')';
+      else asof.textContent = 'as of last manual check';
+    }
+  }
 }
 
 // ---- live polling: fetch getSystemData + each zone's getZoneData directly ----
@@ -742,6 +940,8 @@ async function refreshState() {
     const centralTempInput = document.getElementById('centralTemp');
     setValueUnlessFocused(document.getElementById('fanSpeed'), fanSpeed);
     setValueUnlessFocused(centralTempInput, centralDesiredTemp);
+    const fanDisplay = document.getElementById('fan-speed-display');
+    if (fanDisplay) fanDisplay.textContent = document.getElementById('fanSpeed').value;
     // Mirror the INPUT, not the raw response. setValueUnlessFocused() may have
     // declined the write (field focused, or inside its grace window), and
     // painting the response straight onto the big display anyway would leave
@@ -749,7 +949,10 @@ async function refreshState() {
     // while the headline number snaps back to 22.0 looks just as much like
     // "the change didn't take" as the button reverting did.
     const centralDisplay = document.getElementById('central-temp-display');
-    if (centralDisplay && centralTempInput) centralDisplay.textContent = (parseFloat(centralTempInput.value) || 0).toFixed(1) + '°';
+    if (centralDisplay && centralTempInput) {
+      centralDisplay.innerHTML = (parseFloat(centralTempInput.value) || 0).toFixed(1) + '<span class="dial-unit">°</span>';
+    }
+    updateDialRing('dial-ring', centralTempInput ? centralTempInput.value : null, onOff === '1');
 
     const note = document.getElementById('central-state-note');
     if (note) {
@@ -786,19 +989,34 @@ async function refreshState() {
       const offBtn = document.querySelector(`[data-zone-off="${z}"]`);
       setActiveEl(onBtn, setting === '1');
       setActiveEl(offBtn, setting === '0');
+      const tile = onBtn ? onBtn.closest('.zone-tile') : null;
+      if (tile) tile.classList.toggle('on', setting === '1');
 
       // Same helper as every other value write, rather than a bespoke
       // focus-only check: this select is not just a readout, its value is
       // baked into the zone's temp/damper command URLs, so a stale refresh
       // overwriting it changes what the next ✓ tap actually sends.
-      setValueUnlessFocused(document.querySelector(`[data-zone-setting="${z}"]`), setting);
+      const settingSelect = document.querySelector(`[data-zone-setting="${z}"]`);
+      setValueUnlessFocused(settingSelect, setting);
+      const tempInput = document.querySelector(`[data-zone-temp-input="${z}"]`);
+      setValueUnlessFocused(tempInput, desiredTemp);
       const percentInput = document.querySelector(`[data-zone-percent-input="${z}"]`);
       setValueUnlessFocused(percentInput, percent);
-      setValueUnlessFocused(document.querySelector(`[data-zone-temp-input="${z}"]`), desiredTemp);
       // Mirrors the slider for the same reason the central display mirrors
       // its input -- see the comment above.
-      const percentDisplay = document.querySelector(`[data-zone-percent-display="${z}"]`);
-      if (percentDisplay && percentInput) percentDisplay.textContent = percentInput.value + '%';
+      const percentDisplay = document.getElementById('zone-percent-display-val');
+      if (percentDisplay && percentInput && String(z) === String(openZoneId)) percentDisplay.textContent = percentInput.value + '%';
+
+      if (String(z) === String(openZoneId)) {
+        const zDisplay = document.getElementById('zone-temp-display');
+        if (zDisplay && tempInput) zDisplay.innerHTML = (parseFloat(tempInput.value) || 0).toFixed(1) + '<span class="dial-unit">°</span>';
+        updateDialRing('zone-dial-ring', tempInput ? tempInput.value : null, setting === '1');
+        const stateDisplay = document.getElementById('zone-state-display');
+        if (stateDisplay) {
+          stateDisplay.textContent = setting === '1' ? 'On' : setting === '0' ? 'Off' : '?';
+          stateDisplay.className = 'stat-value ' + (setting === '1' ? 'state-on' : setting === '0' ? 'state-off' : '');
+        }
+      }
 
       if (actualTemp !== null) {
         saveZoneTemp(z, actualTemp);
@@ -834,6 +1052,7 @@ function stopPolling() {
 
 document.getElementById('live-poll-toggle').addEventListener('change', (e) => {
   haptic('light');
+  document.getElementById('live-poll-track').classList.toggle('on', e.target.checked);
   localStorage.setItem('livePollEnabled', e.target.checked ? '1' : '0');
   if (e.target.checked) {
     refreshState();
@@ -847,6 +1066,7 @@ document.addEventListener('visibilitychange', () => {
 });
 if (localStorage.getItem('livePollEnabled') === '1') {
   document.getElementById('live-poll-toggle').checked = true;
+  document.getElementById('live-poll-track').classList.add('on');
   startPolling();
 }
 // always attempt one read on startup, regardless of the auto-refresh toggle
@@ -907,6 +1127,14 @@ function applyOptimisticActive(link) {
     el.classList.toggle('active', el === link);
     markRecentlySent(el);
   }
+  if (link.id === 'link-on' || link.id === 'link-off') {
+    updateDialRing('dial-ring', document.getElementById('centralTemp').value, link.id === 'link-on');
+  }
+  const z = link.getAttribute('data-zone-on') || link.getAttribute('data-zone-off');
+  if (z) {
+    const tile = link.closest('.zone-tile');
+    if (tile) tile.classList.toggle('on', !!link.getAttribute('data-zone-on'));
+  }
 }
 
 // ---- data buttons (.data): in the native app there's no such thing as
@@ -937,16 +1165,16 @@ document.getElementById('raw-output-close').addEventListener('click', () => {
   document.getElementById('raw-output-sheet').style.display = 'none';
 });
 
-// ---- screen navigation (main <-> settings) ----
+// ---- screen navigation (main <-> settings <-> zone detail) ----
 // Every switch goes through one helper so a screen added later can't
 // half-implement the transition. #raw-output-sheet is a page-level fixed
-// overlay that deliberately sits OUTSIDE both view containers (it has to be
+// overlay that deliberately sits OUTSIDE every view container (it has to be
 // able to cover whichever view is showing), which means nothing hides it
 // when the view underneath changes: open it from Settings' "Get System
-// Data", tap Back, and the raw XML stays pinned over the main control
-// screen with nothing on screen that produced it. Reset it here rather than
-// in each handler, so that stays true for the next screen too.
-const VIEW_IDS = ['main-view', 'settings-view'];
+// Data", tap Back, and the raw XML stays pinned over whatever's showing
+// underneath with nothing on screen that produced it. Reset it here rather
+// than in each handler, so that stays true for every screen.
+const VIEW_IDS = ['main-view', 'settings-view', 'zone-view'];
 function showView(id) {
   document.getElementById('raw-output-sheet').style.display = 'none';
   VIEW_IDS.forEach(v => {
@@ -969,11 +1197,92 @@ document.getElementById('settings-close').addEventListener('click', () => {
   refreshState();
 });
 
+// Re-points every reusable data-zone-* field inside #zone-view at zone `z`
+// (a single set of elements, not one copy per zone -- see the openZoneId
+// comment above) and shows the screen. Existing generic data-zone-* queries
+// in updateLinks()/refreshState()/getAssociatedInputs() need no changes at
+// all: they already loop over "however many elements match," which
+// degrades correctly from N per-zone copies to this one reusable set.
+function openZoneDetail(z) {
+  openZoneId = z;
+  const names = loadZoneNames();
+  const temps = loadZoneTemps();
+  const zoneName = names[z] || ('Zone ' + z);
+  document.getElementById('zone-view-name').textContent = zoneName;
+  document.getElementById('zone-view-sub').textContent = 'Zone ' + z;
+
+  const tempLink = document.querySelector('[data-zone-temp-link]');
+  const tempInput = document.querySelector('[data-zone-temp-input]');
+  const percentLink = document.querySelector('[data-zone-percent-link]');
+  const percentInput = document.querySelector('[data-zone-percent-input]');
+  const settingSelect = document.querySelector('[data-zone-setting]');
+  const nameInput = document.querySelector('[data-zone-name-input]');
+  const actualTempInput = document.querySelector('[data-zone-actualtemp-input]');
+  const dataLink = document.querySelector('[data-zone-data]');
+
+  // These are the SAME physical elements the previously-open zone (if any)
+  // was just using. Drop any grace-window protection left on them before
+  // re-pointing -- otherwise a command sent for the OLD zone a moment ago
+  // could still be shielding these fields from the fresh refresh triggered
+  // below, even though they now belong to a different zone. See the
+  // matching guard in sendCommand() for the other half of this race.
+  [tempInput, percentInput, settingSelect].forEach(clearRecentlySent);
+
+  tempLink.setAttribute('data-zone-temp-link', z);
+  tempInput.setAttribute('data-zone-temp-input', z);
+  percentLink.setAttribute('data-zone-percent-link', z);
+  percentInput.setAttribute('data-zone-percent-input', z);
+  settingSelect.setAttribute('data-zone-setting', z);
+  nameInput.setAttribute('data-zone-name-input', z);
+  actualTempInput.setAttribute('data-zone-actualtemp-input', z);
+  dataLink.setAttribute('data-zone-data', z);
+
+  // Reset to neutral placeholders immediately rather than leaving the
+  // PREVIOUS zone's actual values in place under this zone's name: besides
+  // being misleading on screen, the updateLinks() call below bakes whatever
+  // is in these fields into THIS zone's <checkmark> command hrefs, so
+  // tapping Set before the fire-and-forget refreshState() below resolves
+  // would send the old zone's stale temp/damper/setting as the new zone's.
+  tempInput.value = '22';
+  percentInput.value = '80';
+  settingSelect.value = '1';
+
+  nameInput.value = names[z] || '';
+  const temp = temps[z] || {};
+  actualTempInput.value = temp.value || '';
+  updateZoneTempUI(z, temp.value || '', temp.value ? 'manual' : null);
+
+  showView('zone-view');
+  updateLinks();
+  // Fire-and-forget, same pattern as settings-close: the fields above show
+  // neutral/default values immediately, then this fills in live state
+  // (desired temp, damper %, on/off) the moment it resolves.
+  refreshState();
+}
+document.getElementById('zone-back').addEventListener('click', () => {
+  haptic('light');
+  showView('main-view');
+  openZoneId = null;
+});
+
 async function sendCommand(link) {
   const href = link.getAttribute('href');
   const b = base();
   if (!href || href === '#' || !href.startsWith(b)) return;
   const relPath = href.slice(b.length);
+  // Which zone (if any) this command was actually sent for -- captured NOW,
+  // before the request goes out. link is one of the reusable #zone-view
+  // elements, and openZoneDetail() can re-point that SAME element to a
+  // DIFFERENT zone while this request is still in flight (e.g. tap Set,
+  // then immediately back out and open another zone before the response
+  // comes back). Reading link's data-zone-*-link attribute again below,
+  // after the await, would pick up whichever zone is open BY THEN, not the
+  // one this command was for -- misapplying (or clearing) the grace window
+  // meant for this zone onto the new zone's fields instead. See the
+  // matching guard in openZoneDetail(). null for non-zone-scoped commands
+  // (central temp/fan), which are never re-pointed.
+  const sentForZone = link.getAttribute('data-zone-temp-link') || link.getAttribute('data-zone-percent-link') || null;
+  const stillOnSameZone = () => sentForZone === null || String(sentForZone) === String(openZoneId);
 
   link.classList.add('pending');
 
@@ -986,8 +1295,10 @@ async function sendCommand(link) {
     // Protect the field this command was for -- even the delayed refresh
     // below, or the 15s auto-refresh, or a refresh from switching back to
     // the app, could otherwise land before the unit finishes applying the
-    // change and stomp your entry back to the old value.
-    getAssociatedInputs(link).forEach(el => markRecentlySent(el));
+    // change and stomp your entry back to the old value. Skipped if the
+    // zone has since changed (see sentForZone above) -- these fields no
+    // longer belong to the zone this command was for.
+    if (stillOnSameZone()) getAssociatedInputs(link).forEach(el => markRecentlySent(el));
     // Give the unit a moment to actually apply the change before re-reading
     // its state -- querying immediately can race the unit's own internal
     // update and read back the pre-change value, which then overwrites
@@ -1004,7 +1315,7 @@ async function sendCommand(link) {
     // optimistic guess is bad is also the case refreshState() is forbidden
     // from fixing.
     for (const el of optimisticPeerGroup(link)) clearRecentlySent(el);
-    for (const el of getAssociatedInputs(link)) clearRecentlySent(el);
+    if (stillOnSameZone()) for (const el of getAssociatedInputs(link)) clearRecentlySent(el);
     const statusEl = document.getElementById('live-poll-status');
     if (isNative()) {
       if (statusEl) statusEl.textContent = `Command failed to send: ${describeFetchError(err)}`;

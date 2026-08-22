@@ -14,7 +14,7 @@ test('zones render on load', async ({ page }) => {
   await seedConnSettings(page);
   await mockController(page);
   await page.goto('/index.html');
-  await expect(page.locator('#zone-container details')).toHaveCount(3);
+  await expect(page.locator('#zone-container .zone-tile')).toHaveCount(3);
 });
 
 // Regression test for the bug where a zone's On/Off pill (inside <summary>,
@@ -173,7 +173,7 @@ test("a zone's on/off select holds the setting its command just sent even if a r
   await mockController(page, { staleGetSystemData: true });
   await page.goto('/index.html');
 
-  await page.locator('[data-zone-title-name="2"]').click(); // expand zone 2's card
+  await page.locator('[data-zone-title-name="2"]').click(); // opens zone 2's detail screen
   const settingSelect = page.locator('[data-zone-setting="2"]');
   await expect(settingSelect).toHaveValue('0'); // load-time refresh reflects the unit: zone 2 is off
 
@@ -205,7 +205,7 @@ test('a failed command releases its grace window so the next refresh corrects th
   // Highlight went on optimistically, but the unit never got the command.
   // Flipping auto-refresh on runs refreshState() immediately; it must be
   // allowed to clear the highlight rather than being held off for 5s.
-  await page.locator('.zone-summary-name', { hasText: 'Live refresh' }).click(); // expand the card holding the toggle
+  await page.locator('#settings-open').click(); // Live Refresh now lives on the Settings screen
   await page.locator('#live-poll-toggle').check();
   await expect(page.locator('#link-on')).not.toHaveClass(/active/, { timeout: 3000 });
 });
@@ -265,6 +265,48 @@ test('returning from settings re-reads system state', async ({ page }) => {
   const refreshed = page.waitForRequest((req) => req.url().includes('/getSystemData'), { timeout: 3000 });
   await page.locator('#settings-close').click();
   await refreshed;
+});
+
+test('zone detail opens and closes without navigating away', async ({ page }) => {
+  await mockController(page);
+  await page.goto('/index.html');
+  const startUrl = page.url();
+
+  await expect(page.locator('#main-view')).toBeVisible();
+  await expect(page.locator('#zone-view')).toBeHidden();
+
+  await page.locator('[data-zone-open="2"]').click();
+  await expect(page.locator('#zone-view')).toBeVisible();
+  await expect(page.locator('#main-view')).toBeHidden();
+  await expect(page.locator('#zone-view-name')).toHaveText('TK BEDROOM');
+
+  await page.locator('#zone-back').click();
+  await expect(page.locator('#main-view')).toBeVisible();
+  await expect(page.locator('#zone-view')).toBeHidden();
+  expect(page.url()).toBe(startUrl);
+});
+
+// Same regression class as the Settings/native-only sheet-leak checks: the
+// sheet is a page-level overlay outside every view container, so nothing
+// hides it automatically when Zone Detail's back button changes the view.
+test('opening a zone does not leak the raw-output sheet across the transition', async ({ page }) => {
+  const nativeBase = 'http://192.168.1.192:2025';
+  await page.addInitScript(() => {
+    window.Capacitor = {
+      isNativePlatform: () => true,
+      Plugins: { Haptics: { impact: async () => {}, notification: async () => {} } },
+    };
+  });
+  await mockController(page, { nativeBase });
+  await page.goto('/index.html');
+
+  await page.locator('[data-zone-open="1"]').click();
+  await page.locator('[data-zone-data="1"]').click();
+  const sheet = page.locator('#raw-output-sheet');
+  await expect(sheet).toBeVisible();
+
+  await page.locator('#zone-back').click();
+  await expect(sheet).toBeHidden();
 });
 
 test('mode buttons (Cool/Heat/Fan) send silently and show selected', async ({ page }) => {
