@@ -125,6 +125,34 @@ test('power On button stays selected even if a refresh reads stale state', async
   await expect(onLink).toHaveClass(/active/);
 });
 
+// Same bug class again, but for the "Unit is ON/OFF..." caption below the
+// dial -- a fifth mirror of link-on's protected state, found by a review of
+// this fix's port into the sibling ios-app repo: it still read the raw
+// airconOnOff response instead of link-on's already-protected classList, so
+// it could show "Unit is OFF" while the Power button right above it
+// correctly still showed ON.
+test('the "Unit is ON/OFF" caption matches the Power button even if a refresh reads stale state', async ({ page }) => {
+  await mockController(page, { staleGetSystemData: true });
+  await page.goto('/index.html');
+
+  const note = page.locator('#central-state-note');
+  await expect(note).toContainText('Unit is OFF'); // load-time refresh reflects the unit: off
+
+  const onLink = page.locator('#link-on');
+  const requestPromise = page.waitForRequest((req) => req.url().includes('/setSystemData') && req.url().includes('airconOnOff=1'));
+  await onLink.click();
+  await requestPromise;
+
+  // Give the app's internal 900ms delay + refreshState() call time to run
+  // against the stale (never-catches-up) snapshot -- without the fix, this
+  // is where the caption would flip back to "OFF" even though the button
+  // stays ON.
+  await page.waitForTimeout(1500);
+
+  await expect(onLink).toHaveClass(/active/);
+  await expect(note).toContainText('Unit is ON');
+});
+
 // Same bug class, zone On/Off variant: refreshState() sets these via a
 // direct classList.toggle() rather than setActive(), so it's a distinct
 // code path that needs its own coverage even though the fix is the same.
