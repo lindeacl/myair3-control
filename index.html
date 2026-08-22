@@ -6,7 +6,7 @@
 <title>MyAir3 Control</title>
 
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0b0b0f">
+<meta name="theme-color" content="#06070a">
 
 <!-- Android / Chrome -->
 <meta name="mobile-web-app-capable" content="yes">
@@ -19,85 +19,132 @@
 <link rel="icon" href="icons/icon-192.png">
 
 <style>
+  /* ============================================================
+     Obsidian Glass — visual finish only. Every selector, id and
+     data-attribute the app's logic and e2e specs rely on is
+     unchanged; this file only changes how they look. Material
+     rules: one dark field, glass panels lit from the top edge
+     (1px border + inset highlight), gradient key colour reserved
+     for the single active control, everything else recedes.
+     ============================================================ */
   :root {
     color-scheme: dark;
-    --bg: #0b0b0f;
-    --card: #17171d;
-    --card-2: #1e1e26;
-    --border: #2a2a34;
-    --text: #f2f2f5;
-    --muted: #8b8b96;
-    --accent: #3b82f6;
-    --accent-soft: rgba(59, 130, 246, 0.18);
-    --danger: #ef4444;
-    --danger-soft: rgba(239, 68, 68, 0.18);
-    --success: #22c55e;
+    --bg: #06070a;
+    --card: rgba(255, 255, 255, 0.055);
+    --card-2: rgba(255, 255, 255, 0.08);
+    --card-3: rgba(255, 255, 255, 0.11);
+    --border: rgba(255, 255, 255, 0.09);
+    --border-strong: rgba(255, 255, 255, 0.14);
+    --lip: inset 0 1px 0 rgba(255, 255, 255, 0.13);
+    --lip-strong: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.5);
+    --faint: rgba(255, 255, 255, 0.34);
+    --accent: #7be0ff;
+    --accent-deep: #3f6ff0;
+    --accent-lift: #6fa8ff;
+    --accent-soft: rgba(123, 224, 255, 0.14);
+    --accent-line: rgba(123, 224, 255, 0.32);
+    --danger: #f87171;
+    --danger-soft: rgba(248, 113, 113, 0.16);
+    --success: #34d399;
+    --shadow-panel: 0 12px 30px rgba(0, 0, 0, 0.45);
+    --shadow-key: 0 4px 14px rgba(63, 111, 240, 0.45);
+    --r-lg: 22px;
+    --r-md: 16px;
+    --r-sm: 12px;
   }
   * { box-sizing: border-box; }
+  /* The ambient field lives on <html> so it fills the viewport even though
+     body is a 480px centred column. */
+  html {
+    background: #06070a radial-gradient(125% 60% at 50% -6%, #1b2b3f 0%, #0b0f16 52%, #06070a 100%) no-repeat fixed;
+    min-height: 100%;
+  }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     max-width: 480px;
     margin: 0 auto;
     padding: 14px;
     padding-top: calc(14px + env(safe-area-inset-top));
-    padding-bottom: calc(24px + env(safe-area-inset-bottom));
-    background: var(--bg);
+    padding-bottom: calc(28px + env(safe-area-inset-bottom));
+    background: transparent;
     color: var(--text);
+    -webkit-font-smoothing: antialiased;
   }
 
-  header { margin-bottom: 18px; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-  h1 { font-size: 21px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
-  .sub { color: var(--muted); font-size: 12.5px; margin: 2px 0 0; }
+  header { margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -0.02em; }
+  .sub { color: var(--muted); font-size: 12.5px; font-weight: 500; margin: 5px 0 0; }
 
+  /* ---- Glass panel ---- */
   .card {
-    background: var(--card);
+    background: linear-gradient(180deg, var(--card-2), var(--card));
     border: 1px solid var(--border);
-    border-radius: 18px;
+    box-shadow: var(--lip), var(--shadow-panel);
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+    border-radius: var(--r-lg);
     padding: 18px;
     margin-bottom: 14px;
   }
   .card-title {
-    font-size: 12px;
-    font-weight: 700;
+    font-size: 10.5px;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.12em;
     color: var(--muted);
-    margin: 0 0 10px;
+    margin: 0 0 12px;
     display: flex;
     align-items: center;
     gap: 6px;
   }
   .card-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
-  .card-value { font-size: 13.5px; font-weight: 700; color: var(--accent); }
+  .card-value { font-size: 13.5px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
 
-  label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.06em; }
+  label {
+    display: block; font-size: 10.5px; color: var(--muted); margin: 14px 0 6px;
+    text-transform: uppercase; font-weight: 600; letter-spacing: 0.12em;
+  }
   label:first-of-type { margin-top: 0; }
   input[type="text"], input[type="number"], input:not([type]), select {
     width: 100%;
     box-sizing: border-box;
-    padding: 12px 13px;
-    border-radius: 12px;
+    padding: 12px 14px;
+    border-radius: 14px;
     border: 1px solid var(--border);
-    background: var(--card-2);
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: var(--lip);
     color: var(--text);
     font-size: 15px;
     font-family: inherit;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  select {
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 32px;
   }
   input[type="range"] {
     -webkit-appearance: none; appearance: none;
     width: 100%; height: 8px; border-radius: 6px; margin: 10px 0 0;
-    background: var(--card-2); border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.07); border: 1px solid var(--border);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
   }
   input[type="range"]::-webkit-slider-runnable-track { height: 8px; border-radius: 6px; background: transparent; }
   input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
-    background: #fff; border: 3px solid var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,0.4);
-    margin-top: -8px; cursor: pointer;
+    -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%;
+    background: linear-gradient(180deg, #ffffff, #dfe7f5);
+    border: none; box-shadow: 0 0 0 1px rgba(0,0,0,0.3), 0 2px 6px rgba(0,0,0,0.5), inset 0 1px 0 #fff;
+    margin-top: -9px; cursor: pointer;
   }
   input[type="range"]::-moz-range-track { height: 8px; border-radius: 6px; background: transparent; }
   input[type="range"]::-moz-range-thumb {
-    width: 22px; height: 22px; border-radius: 50%; background: #fff;
-    border: 3px solid var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,0.4); cursor: pointer;
+    width: 24px; height: 24px; border-radius: 50%; background: #fff;
+    border: none; box-shadow: 0 2px 6px rgba(0,0,0,0.5); cursor: pointer;
   }
   input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 
@@ -109,7 +156,12 @@
   .visually-hidden-input {
     position: absolute;
     opacity: 0;
-    width: 1px;
+    /* !important because input[type="number"]{width:100%} above out-specifies
+       this class, which left these absolutely-positioned inputs sizing
+       against the viewport and pushing real horizontal scroll on a phone.
+       Only the box size is forced -- opacity/position/pointer-events stay as
+       described above, since automation depends on a hit-testable box. */
+    width: 1px !important;
     height: 1px;
     pointer-events: none;
   }
@@ -120,11 +172,12 @@
 
   button.icon-btn, a.icon-btn {
     flex: 0 0 auto;
-    width: 38px;
-    height: 38px;
-    border-radius: 12px;
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
     border: 1px solid var(--border);
-    background: var(--card-2);
+    background: linear-gradient(180deg, var(--card-3), var(--card));
+    box-shadow: var(--lip);
     color: var(--text);
     font-size: 16px;
     display: flex;
@@ -134,48 +187,89 @@
     -webkit-tap-highlight-color: transparent;
     cursor: pointer;
     padding: 0;
+    transition: transform 0.12s ease, box-shadow 0.2s ease, background 0.2s ease;
   }
-  a.icon-btn.confirm { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  button.icon-btn:active, a.icon-btn:active { transform: scale(0.94); }
+  a.icon-btn.cmd-like {
+    width: auto; height: auto; min-height: 46px; padding: 12px 14px; flex: 1 1 0;
+    font-size: 13.5px; font-weight: 600; letter-spacing: 0.01em; white-space: nowrap;
+  }
+  a.icon-btn.confirm {
+    background: linear-gradient(180deg, var(--accent-lift), var(--accent-deep));
+    border-color: transparent;
+    box-shadow: var(--lip-strong), var(--shadow-key);
+    color: #fff;
+    font-weight: 700;
+  }
 
   button.nav-btn {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
     border: 1px solid var(--border);
-    background: var(--card-2);
-    color: var(--text);
+    background: linear-gradient(180deg, var(--card-3), var(--card));
+    box-shadow: var(--lip);
+    color: var(--muted);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     flex: 0 0 auto;
     -webkit-tap-highlight-color: transparent;
+    transition: transform 0.12s ease;
   }
+  button.nav-btn:active { transform: scale(0.94); }
 
-  .cmd.pending { opacity: 0.5; }
-  .cmd.sent { box-shadow: 0 0 0 2px var(--success); }
+  .cmd { transition: opacity 0.2s ease, box-shadow 0.25s ease; }
+  .cmd.pending { opacity: 0.45; }
+  .cmd.sent { box-shadow: 0 0 0 2px var(--success), 0 0 16px rgba(52, 211, 153, 0.35); }
 
-  .note { color: var(--muted); font-size: 11.5px; margin-top: 6px; line-height: 1.4; }
-  .caption { color: var(--muted); font-size: 11.5px; line-height: 1.4; margin-top: 8px; }
-  small.foot-status { color: var(--muted); font-size: 11.5px; display: block; margin-top: 8px; line-height: 1.4; }
+  .note { color: var(--faint); font-size: 11.5px; margin-top: 6px; line-height: 1.45; }
+  .caption { color: var(--faint); font-size: 11.5px; line-height: 1.45; margin-top: 8px; }
+  small.foot-status { color: var(--faint); font-size: 11.5px; display: block; margin-top: 8px; line-height: 1.45; }
+  code { font-size: 0.92em; background: rgba(255, 255, 255, 0.07); padding: 1px 5px; border-radius: 5px; }
 
   svg.i { width: 20px; height: 20px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
   svg.i-sm { width: 16px; height: 16px; }
 
   /* ---- Power switch: compact two-pill, sits above each dial ---- */
-  .power-row { display: flex; justify-content: center; margin-bottom: 16px; }
-  .switch-track { display: flex; background: var(--card-2); border: 1px solid var(--border); border-radius: 12px; padding: 3px; width: 132px; }
-  .switch-track a { flex: 1; text-align: center; padding: 8px 4px; border-radius: 9px; text-decoration: none; color: var(--muted); font-size: 12.5px; font-weight: 700; }
-  .switch-track a.active { background: var(--accent); color: #fff; }
-  .switch-track a.off.active { background: var(--danger); }
+  .power-row { display: flex; justify-content: center; margin-bottom: 14px; }
+  .switch-track {
+    display: flex; gap: 4px; padding: 4px; width: 168px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    box-shadow: var(--lip);
+    border-radius: var(--r-md);
+  }
+  .switch-track a {
+    flex: 1; text-align: center; padding: 10px 4px; border-radius: var(--r-sm);
+    text-decoration: none; color: var(--muted); font-size: 12.5px; font-weight: 700;
+    letter-spacing: 0.03em; -webkit-tap-highlight-color: transparent;
+    transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .switch-track a.active {
+    background: linear-gradient(180deg, var(--accent-lift), var(--accent-deep));
+    color: #fff; box-shadow: var(--lip-strong), var(--shadow-key);
+  }
+  .switch-track a.off.active {
+    background: linear-gradient(180deg, #fb8f8f, #dc3838);
+    box-shadow: var(--lip-strong), 0 4px 14px rgba(220, 56, 56, 0.4);
+  }
 
   /* ---- Dial (shared by the central control and Zone Detail) ---- */
-  .dial-wrap { position: relative; width: 246px; height: 246px; margin: 0 auto 16px; }
+  .dial-wrap { position: relative; width: 252px; height: 252px; margin: 0 auto 14px; }
   .dial-ring-svg { position: absolute; inset: 0; transform: rotate(-90deg); pointer-events: none; }
   /* Both the fill amount and the gradient color jump instantly without this
      -- a tap on +/- or a fresh refresh landing would otherwise snap the ring
      to its new state rather than sweep to it. */
-  #dial-ring, #zone-dial-ring { transition: stroke-dashoffset 0.35s ease, stroke 0.35s ease; }
+  #dial-ring, #zone-dial-ring { transition: stroke-dashoffset 0.35s ease, stroke 0.35s ease, filter 0.35s ease; }
+  /* Bloom behind the ring: a soft radial that reads as the ring lighting the
+     glass it sits on. Purely decorative, never hit-tested. */
+  .dial-wrap::before {
+    content: ""; position: absolute; inset: 26px; border-radius: 50%;
+    background: radial-gradient(80% 80% at 50% 16%, rgba(123, 224, 255, 0.13), transparent 70%);
+    pointer-events: none;
+  }
   /* pointer-events:none because this box spans the full dial (inset:0) for
      centering purposes, but paints AFTER (on top of) the +/- edge buttons in
      DOM order -- without this, its invisible flex gutter steals taps on
@@ -185,70 +279,93 @@
      past review undetected -- see the regression test in
      e2e/aircon-control.spec.js ("dial +/- buttons are clickable...").
      Re-enabled on the one real child that needs to stay tappable. */
-  .dial-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; pointer-events: none; }
+  .dial-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; pointer-events: none; }
   .dial-center .icon-btn { pointer-events: auto; }
-  .dial-temp { font-size: 52px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
-  .dial-unit { font-size: 20px; color: var(--muted); font-weight: 600; }
-  .dial-caption { color: var(--muted); font-size: 11.5px; text-align: center; padding: 0 24px; line-height: 1.4; margin-bottom: 16px; }
+  .dial-temp { font-size: 62px; font-weight: 250; letter-spacing: -0.045em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .dial-unit { font-size: 22px; color: var(--muted); font-weight: 500; letter-spacing: 0; }
+  .dial-caption { color: var(--faint); font-size: 11.5px; text-align: center; padding: 0 28px; line-height: 1.45; margin-bottom: 16px; }
   .dial-edge {
     position: absolute; top: 50%; transform: translateY(-50%);
-    width: 40px; height: 40px; border-radius: 50%; background: var(--card-2);
-    border: 1px solid var(--border); color: var(--text);
+    width: 44px; height: 44px; border-radius: 50%;
+    background: linear-gradient(180deg, var(--card-3), var(--card));
+    border: 1px solid var(--border-strong);
+    box-shadow: var(--lip-strong), 0 6px 16px rgba(0, 0, 0, 0.4);
+    color: var(--text);
     display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.12s ease;
   }
+  .dial-edge:active { transform: translateY(-50%) scale(0.92); }
   .dial-edge.minus { left: -6px; }
   .dial-edge.plus { right: -6px; }
 
-  /* ---- Mode circles ---- */
-  .mode-row { display: flex; justify-content: center; gap: 14px; margin-bottom: 18px; }
-  .mode-circle {
-    width: 60px; height: 60px; border-radius: 50%; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 3px; cursor: pointer;
-    background: var(--card-2); border: 1px solid var(--border); color: var(--muted);
-    text-decoration: none;
+  /* ---- Mode row: one segmented glass strip instead of three loose circles,
+     so the active mode reads as a switch position rather than a lit dot. ---- */
+  .mode-row {
+    display: flex; gap: 4px; padding: 4px; margin: 0 0 14px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    box-shadow: var(--lip);
+    border-radius: var(--r-md);
   }
-  .mode-circle.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-  .mode-circle span { font-size: 10px; font-weight: 700; }
+  .mode-circle {
+    flex: 1; height: 46px; border-radius: var(--r-sm);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    cursor: pointer; background: transparent; border: none; color: var(--muted);
+    text-decoration: none; -webkit-tap-highlight-color: transparent;
+    transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .mode-circle.active {
+    background: linear-gradient(180deg, var(--accent-lift), var(--accent-deep));
+    color: #fff; box-shadow: var(--lip-strong), var(--shadow-key);
+  }
+  .mode-circle span { font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 
   /* ---- Fan strip ---- */
   .fan-strip {
-    display: flex; align-items: center; gap: 10px; background: var(--card);
-    border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 8px;
+    background: linear-gradient(180deg, var(--card-2), var(--card));
+    border: 1px solid var(--border); box-shadow: var(--lip);
+    border-radius: var(--r-md); padding: 11px 12px; margin-bottom: 8px;
   }
-  .fan-strip .fan-label { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; flex: 1; }
-  .mini-step { width: 32px; height: 32px; border-radius: 10px; background: var(--card-2); border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; padding: 0; }
-  .fan-count { font-size: 15px; font-weight: 700; width: 16px; text-align: center; }
+  .fan-strip .fan-label { color: var(--muted); font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; flex: 1 1 auto; min-width: 0; }
+  .mini-step {
+    width: 36px; height: 36px; border-radius: var(--r-sm);
+    background: linear-gradient(180deg, var(--card-3), var(--card));
+    border: 1px solid var(--border); box-shadow: var(--lip);
+    color: var(--text); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex: 0 0 auto; padding: 0;
+    -webkit-tap-highlight-color: transparent; transition: transform 0.12s ease;
+  }
+  .mini-step:active { transform: scale(0.92); }
+  .fan-count { font-size: 15px; font-weight: 600; width: 16px; text-align: center; font-variant-numeric: tabular-nums; }
   a.auto-chip {
-    padding: 8px 12px; border-radius: 10px; background: var(--card-2); border: 1px solid var(--border);
-    color: var(--muted); font-size: 12.5px; font-weight: 700; cursor: pointer; text-decoration: none; flex: 0 0 auto;
+    padding: 9px 12px; border-radius: var(--r-sm); background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border); color: var(--muted); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; text-decoration: none; flex: 0 0 auto;
+    white-space: nowrap; line-height: 1; -webkit-tap-highlight-color: transparent;
   }
-  a.auto-chip.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  a.auto-chip.active { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
 
-  /* ---- Zone tiles ---- */
-  .zones-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 10px; }
-  /* Fixed row, no horizontal scroll -- this house always has a small,
-     known zone count, so tiles share the row evenly instead of being a
-     fixed 112px wide and needing to scroll. flex-wrap is a safety net for
-     if the zone count is ever raised well past what fits one row (wraps to
-     a second row rather than overflowing off-screen), not the normal case. */
-  .zone-scroll { display: flex; flex-wrap: wrap; gap: 12px; padding: 2px; margin-bottom: 14px; }
+  /* ---- Zone rows ---- */
+  .zones-title { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin: 0 0 10px; }
+  /* Rows, not tiles: a full-width row gives the zone name real room and gives
+     the on/off switch a 44px-tall target instead of the ~26px pill it had
+     inside a 90px-wide tile. flex-wrap is kept as the safety net it always
+     was; min-width below is still the floor that makes wrapping fire before
+     any hit-test overlap can happen if the zone count is ever raised far
+     past what fits. */
+  .zone-scroll { display: flex; flex-direction: column; flex-wrap: wrap; gap: 8px; padding: 2px; margin-bottom: 14px; }
   .zone-tile {
-    /* min-width is a floor, not a target: for 3-4 zones the row still fills
-       evenly above this (flex-grow spreads the remaining space), same as
-       before. It matters once zone count is high enough that the even
-       split would go below it -- min-width:0 was tried first and verified
-       (via the Browser pane, not just reasoning) to let tiles shrink past
-       their own icon's 28px width, so at 16 zones the icon visually spilled
-       ~1-2px into the next tile: a real hit-test overlap (the icon is
-       inside the zone's own clickable open-detail area), not just a look.
-       90px keeps every tile at least icon + padding + a few px, so
-       flex-wrap's "start a new row" trigger actually fires before that
-       overlap can happen. */
-    flex: 1 1 0; min-width: 90px; border-radius: 16px; padding: 14px 12px;
-    background: var(--card); border: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px;
+    flex: 1 1 auto; min-width: 90px; border-radius: 18px; padding: 11px 13px;
+    background: linear-gradient(180deg, var(--card-2), var(--card));
+    border: 1px solid var(--border);
+    box-shadow: var(--lip);
+    display: flex; flex-direction: row; align-items: center; gap: 12px;
+    transition: background 0.25s ease, border-color 0.25s ease;
   }
-  .zone-tile.on { background: var(--accent); border-color: var(--accent); }
-  .zone-tile-main { cursor: pointer; display: flex; flex-direction: column; gap: 12px; }
+  .zone-tile.on { background: linear-gradient(180deg, rgba(111, 168, 255, 0.16), rgba(63, 111, 240, 0.08)); border-color: var(--accent-line); }
+  .zone-tile-main { cursor: pointer; display: flex; flex-direction: row; align-items: center; gap: 12px; flex: 1 1 auto; min-width: 0; min-height: 44px; }
   /* --zone-temp-color/--zone-temp-tint are set per-tile by refreshState() from
      the same tempToColor() scale the dial uses, so a zone's icon reads the
      same warm/cool language as the central dial instead of a disconnected
@@ -256,23 +373,37 @@
      reading arrives. The .on variant below stays a flat white-on-accent
      regardless (a higher-specificity selector), since on/off is the
      primary signal here and shouldn't compete with the temp tint. */
-  .zone-tile-icon { width: 28px; height: 28px; border-radius: 9px; background: var(--zone-temp-tint, var(--card-2)); display: flex; align-items: center; justify-content: center; color: var(--zone-temp-color, var(--muted)); flex: 0 0 auto; transition: background 0.35s ease, color 0.35s ease; }
-  .zone-tile.on .zone-tile-icon { background: rgba(255,255,255,0.2); color: #fff; }
-  /* Wraps rather than truncates: with 3 tiles sharing the row evenly (see
-     .zone-scroll above) a tile is narrower than a 12-char name at this
-     weight/size comfortably fits on one line -- and 12 chars is the real
-     ceiling (the unit itself cuts names off there), so wrapping to a
-     second line reliably shows the full name instead of ellipsizing it. */
-  .zone-tile-name { font-size: 13px; font-weight: 700; line-height: 1.25; overflow-wrap: break-word; }
+  .zone-tile-icon { width: 36px; height: 36px; border-radius: var(--r-sm); background: var(--zone-temp-tint, rgba(255, 255, 255, 0.06)); display: flex; align-items: center; justify-content: center; color: var(--zone-temp-color, var(--muted)); flex: 0 0 auto; transition: background 0.35s ease, color 0.35s ease; }
+  .zone-tile.on .zone-tile-icon { background: var(--accent-soft); color: var(--accent); }
+  /* Wraps rather than truncates: 12 characters is the real ceiling (the unit
+     itself cuts names off there), and a full-width row now fits that on one
+     line comfortably -- the wrap stays as insurance rather than the norm. */
+  .zone-tile-name { font-size: 14px; font-weight: 600; line-height: 1.2; overflow-wrap: break-word; }
   .zone-tile.on .zone-tile-name { color: #fff; }
-  .zone-tile-temp { font-size: 11px; color: var(--muted); margin-top: 2px; }
-  .zone-tile.on .zone-tile-temp { color: rgba(255,255,255,0.85); }
-  .zone-onoff { display: flex; gap: 4px; background: var(--card-2); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
-  .zone-tile.on .zone-onoff { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.3); }
-  .zone-onoff a { padding: 5px 6px; border-radius: 6px; font-size: 10.5px; font-weight: 700; text-decoration: none; color: var(--muted); flex: 1; text-align: center; }
-  .zone-tile.on .zone-onoff a { color: rgba(255,255,255,0.7); }
-  .zone-onoff a.active { background: var(--accent); color: #fff; }
-  .zone-onoff a.off.active { background: var(--danger); }
+  .zone-tile-temp { font-size: 11.5px; font-weight: 500; color: var(--faint); margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .zone-tile.on .zone-tile-temp { color: rgba(255, 255, 255, 0.55); }
+  .zone-onoff {
+    display: flex; gap: 3px; background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border); box-shadow: var(--lip);
+    border-radius: var(--r-sm); padding: 3px; flex: 0 0 auto;
+  }
+  .zone-tile.on .zone-onoff { background: rgba(0, 0, 0, 0.18); border-color: var(--border); }
+  .zone-onoff a {
+    min-height: 44px; padding: 0 14px; border-radius: 10px; font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    letter-spacing: 0.04em; text-transform: uppercase; text-decoration: none;
+    color: var(--muted); text-align: center; -webkit-tap-highlight-color: transparent;
+    transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .zone-tile.on .zone-onoff a { color: var(--faint); }
+  .zone-onoff a.active {
+    background: linear-gradient(180deg, var(--accent-lift), var(--accent-deep));
+    color: #fff; box-shadow: var(--lip-strong), var(--shadow-key);
+  }
+  .zone-onoff a.off.active {
+    background: linear-gradient(180deg, #fb8f8f, #dc3838);
+    box-shadow: var(--lip-strong), 0 4px 14px rgba(220, 56, 56, 0.4);
+  }
 
   /* ---- Back-row header (Settings + Zone Detail) ---- */
   .back-row { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
@@ -280,71 +411,98 @@
 
   /* ---- Stat cards (Zone Detail) ---- */
   .stat-row { display: flex; gap: 10px; margin-bottom: 14px; }
-  .stat-card { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 4px; }
-  .stat-label { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
-  .stat-value { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+  .stat-card {
+    flex: 1; background: linear-gradient(180deg, var(--card-2), var(--card));
+    border: 1px solid var(--border); box-shadow: var(--lip);
+    border-radius: var(--r-md); padding: 13px 14px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .stat-label { color: var(--muted); font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; }
+  .stat-value { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
   .stat-value.state-on { color: var(--accent); }
-  .stat-value.state-off { color: var(--muted); }
+  .stat-value.state-off { color: var(--faint); }
 
   a.diag-row {
-    display: flex; align-items: center; gap: 8px; padding: 13px 14px;
+    display: flex; align-items: center; gap: 10px; padding: 13px 14px;
     color: var(--text); cursor: pointer; text-decoration: none;
-    background: var(--card); border: 1px solid var(--border); border-radius: 16px; margin-bottom: 14px;
+    background: rgba(255, 255, 255, 0.035); border: 1px solid var(--border);
+    border-radius: var(--r-md); margin-bottom: 14px;
+    -webkit-tap-highlight-color: transparent;
   }
-  a.diag-row span { flex: 1; font-size: 13.5px; font-weight: 600; }
+  a.diag-row span { flex: 1; font-size: 13px; font-weight: 500; color: var(--muted); }
 
   /* ---- Toggle switch (Settings: live refresh) ---- */
   .switch-row2 { display: flex; align-items: center; gap: 12px; }
-  .switch-label { flex: 1; font-size: 14.5px; font-weight: 600; }
+  .switch-label { flex: 1; font-size: 14px; font-weight: 500; }
   .toggle-track {
-    width: 46px; height: 26px; border-radius: 13px; background: var(--card-2);
-    border: 1px solid var(--border); position: relative; flex: 0 0 auto;
+    width: 48px; height: 29px; border-radius: 15px; background: rgba(255, 255, 255, 0.09);
+    border: 1px solid var(--border); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+    position: relative; flex: 0 0 auto; transition: background 0.2s ease, box-shadow 0.2s ease;
   }
-  .toggle-track.on { background: var(--accent); border-color: var(--accent); }
-  .toggle-knob { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform 0.15s; pointer-events: none; }
-  .toggle-track.on .toggle-knob { transform: translateX(20px); }
+  .toggle-track.on {
+    background: linear-gradient(180deg, var(--accent-lift), var(--accent-deep));
+    border-color: transparent; box-shadow: var(--lip-strong), var(--shadow-key);
+  }
+  .toggle-knob {
+    position: absolute; top: 2.5px; left: 2.5px; width: 23px; height: 23px; border-radius: 50%;
+    background: linear-gradient(180deg, #fff, #e6ecf7);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); transition: transform 0.18s ease; pointer-events: none;
+  }
+  .toggle-track.on .toggle-knob { transform: translateX(19px); }
   .toggle-input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
 
   #install-banner {
     display: none;
-    background: var(--card);
+    background: linear-gradient(180deg, var(--card-2), var(--card));
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 10px 12px;
-    font-size: 13px;
+    box-shadow: var(--lip);
+    border-radius: var(--r-md);
+    padding: 12px 14px;
+    font-size: 12.5px;
+    line-height: 1.45;
     color: var(--muted);
     margin-bottom: 12px;
   }
-  #install-banner button { background: none; border: none; color: var(--muted); float: right; font-size: 13px; }
+  #install-banner button { background: none; border: none; color: var(--faint); float: right; font-size: 13px; }
 
   #raw-output-sheet {
     display: none;
     position: fixed;
     left: 0; right: 0; bottom: 0;
     max-height: 60vh;
-    background: var(--card);
-    border-top: 1px solid var(--border);
-    border-radius: 16px 16px 0 0;
-    padding: 12px 14px calc(14px + env(safe-area-inset-bottom));
-    box-shadow: 0 -8px 24px rgba(0,0,0,0.4);
+    background: rgba(12, 16, 22, 0.86);
+    -webkit-backdrop-filter: blur(28px);
+    backdrop-filter: blur(28px);
+    border-top: 1px solid var(--border-strong);
+    border-radius: 22px 22px 0 0;
+    padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.6);
   }
-  #raw-output-sheet .sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-  #raw-output-sheet .sheet-head span { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
-  #raw-output-sheet button { background: var(--card-2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; width: 28px; height: 28px; }
-  #raw-output { white-space: pre-wrap; word-break: break-all; font-size: 12px; color: var(--text); max-height: 46vh; overflow: auto; margin: 0; }
+  #raw-output-sheet .sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  #raw-output-sheet .sheet-head span { font-size: 10.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; }
+  #raw-output-sheet button {
+    background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border); color: var(--text);
+    border-radius: 10px; width: 30px; height: 30px;
+  }
+  #raw-output {
+    white-space: pre-wrap; word-break: break-all;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11.5px; line-height: 1.6; color: var(--accent);
+    background: rgba(0, 0, 0, 0.45); border-radius: 14px; padding: 12px;
+    max-height: 46vh; overflow: auto; margin: 0;
+  }
 
   /* ---- Live-connection status dot ---- */
-  .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); margin-right: 6px; vertical-align: 1px; transition: background 0.3s ease; }
-  .live-dot.ok { background: var(--success); }
-  .live-dot.partial { background: #f59e0b; }
-  .live-dot.error { background: var(--danger); }
+  .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); margin-right: 7px; vertical-align: 1px; transition: background 0.3s ease, box-shadow 0.3s ease; }
+  .live-dot.ok { background: var(--success); box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.18); }
+  .live-dot.partial { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18); }
+  .live-dot.error { background: var(--danger); box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.18); }
 
   /* ---- Zone Detail: collapsed-by-default admin controls ---- */
   .advanced-details { margin-top: 4px; }
   .advanced-summary {
     list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px;
-    padding: 10px 2px; color: var(--muted); font-size: 12px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.06em; -webkit-tap-highlight-color: transparent;
+    padding: 12px 2px; color: var(--muted); font-size: 10.5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.12em; -webkit-tap-highlight-color: transparent;
   }
   .advanced-summary::-webkit-details-marker { display: none; }
   .advanced-summary .chev { margin-left: auto; transition: transform 0.15s; }
@@ -356,6 +514,10 @@
      failure) resolves -- not shown again on later refreshes. ---- */
   .app-loading .dial-temp, .app-loading .zone-tile-temp { animation: shimmer-pulse 1.4s ease-in-out infinite; }
   @keyframes shimmer-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  }
 </style>
 </head>
 <body class="app-loading">
@@ -369,7 +531,7 @@
 <header>
   <div>
     <h1>MyAir3</h1>
-    <div class="sub"><span class="live-dot" id="live-dot"></span>Live &middot; commands send silently</div>
+    <div class="sub"><span class="live-dot" id="live-dot"></span>Living room &middot; auto-refreshing</div>
   </div>
   <button type="button" class="nav-btn" id="settings-open" aria-label="Open settings">
     <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 0 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 0 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15z"/></svg>
@@ -385,8 +547,8 @@
 
 <div class="dial-wrap">
   <svg class="dial-ring-svg" width="246" height="246" viewBox="0 0 246 246">
-    <circle cx="123" cy="123" r="104" fill="none" stroke="#2a2a34" stroke-width="14"/>
-    <circle id="dial-ring" cx="123" cy="123" r="104" fill="none" stroke="#2a2a34" stroke-width="14" stroke-linecap="round" stroke-dasharray="653.5" stroke-dashoffset="653.5"/>
+    <circle cx="123" cy="123" r="104" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="14"/>
+    <circle id="dial-ring" cx="123" cy="123" r="104" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="14" stroke-linecap="round" stroke-dasharray="653.5" stroke-dashoffset="653.5"/>
   </svg>
   <button type="button" class="dial-edge minus" data-step-target="#centralTemp" data-step-delta="-0.5" aria-label="Decrease desired temperature">
     <svg class="i i-sm" viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
@@ -451,8 +613,8 @@
 
   <div class="dial-wrap">
     <svg class="dial-ring-svg" width="246" height="246" viewBox="0 0 246 246">
-      <circle cx="123" cy="123" r="104" fill="none" stroke="#2a2a34" stroke-width="14"/>
-      <circle id="zone-dial-ring" cx="123" cy="123" r="104" fill="none" stroke="#2a2a34" stroke-width="14" stroke-linecap="round" stroke-dasharray="653.5" stroke-dashoffset="653.5"/>
+      <circle cx="123" cy="123" r="104" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="14"/>
+      <circle id="zone-dial-ring" cx="123" cy="123" r="104" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="14" stroke-linecap="round" stroke-dasharray="653.5" stroke-dashoffset="653.5"/>
     </svg>
     <button type="button" class="dial-edge minus" data-step-target="[data-zone-temp-input]" data-step-delta="-0.5" aria-label="Decrease zone desired temperature">
       <svg class="i i-sm" viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
@@ -666,7 +828,12 @@ function updateDialRing(ringId, temp, isOn) {
   const fraction = isOn ? (t - 16) / 14 : 0;
   const offset = Math.round(DIAL_CIRCUMFERENCE * (1 - fraction) * 100) / 100;
   ring.setAttribute('stroke-dashoffset', String(offset));
-  ring.setAttribute('stroke', isOn ? tempToColor(t) : '#2a2a34');
+  // Obsidian Glass finish: the ring carries its own coloured bloom so the
+  // glow always matches the live temperature colour rather than a fixed
+  // accent tint, and goes flat (no glow) when the unit is off.
+  const ringColor = isOn ? tempToColor(t) : 'rgba(255, 255, 255, 0.12)';
+  ring.setAttribute('stroke', ringColor);
+  ring.style.filter = isOn ? `drop-shadow(0 0 9px ${ringColor})` : 'none';
 }
 
 const DEFAULT_ZONE_NAMES = { 1: 'MAIN BEDROOM', 2: 'TK BEDROOM', 3: 'SPARE BEDROO' };
