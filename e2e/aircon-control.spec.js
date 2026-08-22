@@ -17,6 +17,44 @@ test('zones render on load', async ({ page }) => {
   await expect(page.locator('#zone-container .zone-tile')).toHaveCount(3);
 });
 
+// Regression test for the dashboard-redesign request: the zone row used to
+// be a fixed-width horizontal-scroll strip (flex: 0 0 112px tiles inside an
+// overflow-x: auto container); it's now a plain evenly-split row that must
+// never scroll or clip content, at the real mobile width this was reported
+// against (375px -- the default Playwright viewport is 1280x720 and would
+// not have caught either the original scroll strip or the truncation
+// regression this fix also had to correct along the way).
+test('zone row fills the width evenly with no horizontal scroll at mobile width', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await seedConnSettings(page);
+  await mockController(page);
+  await page.goto('/index.html');
+
+  const container = page.locator('#zone-container');
+  await expect(container.locator('.zone-tile')).toHaveCount(3);
+
+  // The row itself must not overflow its own box -- i.e. no horizontal
+  // scrollbar, whatever CSS produces the layout.
+  const overflow = await container.evaluate((el) => el.scrollWidth - el.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+
+  // Each tile's full name must be visible (not clipped by an ellipsis or
+  // any other overflow:hidden truncation) -- this is what the earlier
+  // white-space:nowrap + text-overflow:ellipsis regression broke.
+  const nameOverflows = await container.locator('.zone-tile-name').evaluateAll(
+    (nodes) => nodes.map((n) => n.scrollWidth - n.clientWidth)
+  );
+  for (const delta of nameOverflows) {
+    expect(delta).toBeLessThanOrEqual(1);
+  }
+
+  // And the visible text must be the untruncated default names, not a
+  // "MAIN BED..." style cutoff.
+  await expect(container.locator('.zone-tile-name').nth(0)).toHaveText('MAIN BEDROOM');
+  await expect(container.locator('.zone-tile-name').nth(1)).toHaveText('TK BEDROOM');
+  await expect(container.locator('.zone-tile-name').nth(2)).toHaveText('SPARE BEDROO');
+});
+
 // Regression test for the bug where a zone's On/Off pill (inside <summary>,
 // used stopPropagation() to stop the details card from also toggling open)
 // silently blocked the app's own command handler from ever running --
