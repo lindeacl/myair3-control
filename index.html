@@ -172,6 +172,10 @@
   /* ---- Dial (shared by the central control and Zone Detail) ---- */
   .dial-wrap { position: relative; width: 246px; height: 246px; margin: 0 auto 16px; }
   .dial-ring-svg { position: absolute; inset: 0; transform: rotate(-90deg); pointer-events: none; }
+  /* Both the fill amount and the gradient color jump instantly without this
+     -- a tap on +/- or a fresh refresh landing would otherwise snap the ring
+     to its new state rather than sweep to it. */
+  #dial-ring, #zone-dial-ring { transition: stroke-dashoffset 0.35s ease, stroke 0.35s ease; }
   /* pointer-events:none because this box spans the full dial (inset:0) for
      centering purposes, but paints AFTER (on top of) the +/- edge buttons in
      DOM order -- without this, its invisible flex gutter steals taps on
@@ -245,7 +249,14 @@
   }
   .zone-tile.on { background: var(--accent); border-color: var(--accent); }
   .zone-tile-main { cursor: pointer; display: flex; flex-direction: column; gap: 12px; }
-  .zone-tile-icon { width: 28px; height: 28px; border-radius: 9px; background: var(--card-2); display: flex; align-items: center; justify-content: center; color: var(--muted); flex: 0 0 auto; }
+  /* --zone-temp-color/--zone-temp-tint are set per-tile by refreshState() from
+     the same tempToColor() scale the dial uses, so a zone's icon reads the
+     same warm/cool language as the central dial instead of a disconnected
+     flat gray -- falls back to the plain muted look until the first zone
+     reading arrives. The .on variant below stays a flat white-on-accent
+     regardless (a higher-specificity selector), since on/off is the
+     primary signal here and shouldn't compete with the temp tint. */
+  .zone-tile-icon { width: 28px; height: 28px; border-radius: 9px; background: var(--zone-temp-tint, var(--card-2)); display: flex; align-items: center; justify-content: center; color: var(--zone-temp-color, var(--muted)); flex: 0 0 auto; transition: background 0.35s ease, color 0.35s ease; }
   .zone-tile.on .zone-tile-icon { background: rgba(255,255,255,0.2); color: #fff; }
   /* Wraps rather than truncates: with 3 tiles sharing the row evenly (see
      .zone-scroll above) a tile is narrower than a 12-char name at this
@@ -321,9 +332,33 @@
   #raw-output-sheet .sheet-head span { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
   #raw-output-sheet button { background: var(--card-2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; width: 28px; height: 28px; }
   #raw-output { white-space: pre-wrap; word-break: break-all; font-size: 12px; color: var(--text); max-height: 46vh; overflow: auto; margin: 0; }
+
+  /* ---- Live-connection status dot ---- */
+  .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); margin-right: 6px; vertical-align: 1px; transition: background 0.3s ease; }
+  .live-dot.ok { background: var(--success); }
+  .live-dot.partial { background: #f59e0b; }
+  .live-dot.error { background: var(--danger); }
+
+  /* ---- Zone Detail: collapsed-by-default admin controls ---- */
+  .advanced-details { margin-top: 4px; }
+  .advanced-summary {
+    list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px;
+    padding: 10px 2px; color: var(--muted); font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em; -webkit-tap-highlight-color: transparent;
+  }
+  .advanced-summary::-webkit-details-marker { display: none; }
+  .advanced-summary .chev { margin-left: auto; transition: transform 0.15s; }
+  .advanced-details[open] .advanced-summary .chev { transform: rotate(90deg); }
+  .advanced-body { padding-top: 6px; }
+
+  /* ---- First-load shimmer: a gentle pulse on not-yet-real readouts,
+     cleared by refreshState() the moment the first read (success or
+     failure) resolves -- not shown again on later refreshes. ---- */
+  .app-loading .dial-temp, .app-loading .zone-tile-temp { animation: shimmer-pulse 1.4s ease-in-out infinite; }
+  @keyframes shimmer-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 </style>
 </head>
-<body>
+<body class="app-loading">
 
 <div id="install-banner">
   <button id="install-dismiss" aria-label="Dismiss">✕</button>
@@ -334,7 +369,7 @@
 <header>
   <div>
     <h1>MyAir3</h1>
-    <div class="sub">Live &middot; commands send silently</div>
+    <div class="sub"><span class="live-dot" id="live-dot"></span>Live &middot; commands send silently</div>
   </div>
   <button type="button" class="nav-btn" id="settings-open" aria-label="Open settings">
     <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 0 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 0 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15z"/></svg>
@@ -459,23 +494,30 @@
     <div class="caption">For zones without a temperature sensor.</div>
   </div>
 
-  <div class="row" style="margin-bottom:14px;">
-    <label style="flex:1; margin:0;">Zone setting (used by the ✓ buttons above)</label>
-    <select data-zone-setting="" style="flex:0 0 90px;" aria-label="On/off setting sent with zone commands">
-      <option value="1">On</option>
-      <option value="0">Off</option>
-    </select>
-  </div>
-
   <label>Zone name (from &lt;name&gt; in Get Zone Data)</label>
   <input type="text" data-zone-name-input="" placeholder="e.g. SPARE BEDROO" aria-label="Zone name">
   <div class="caption" style="margin-bottom:14px;">Names over 12 characters get cut off by the unit itself &mdash; not a typo.</div>
 
-  <a class="diag-row data" data-zone-data="" href="#" target="_blank" rel="noopener">
-    <svg class="i i-sm" viewBox="0 0 24 24"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
-    <span>Get Zone Data (raw)</span>
-    <svg class="i i-sm" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
-  </a>
+  <details class="advanced-details">
+    <summary class="advanced-summary">
+      <span>Advanced</span>
+      <svg class="i i-sm chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+    </summary>
+    <div class="advanced-body">
+      <div class="row" style="margin-bottom:14px;">
+        <label style="flex:1; margin:0;">Zone setting (used by the ✓ buttons above)</label>
+        <select data-zone-setting="" style="flex:0 0 90px;" aria-label="On/off setting sent with zone commands">
+          <option value="1">On</option>
+          <option value="0">Off</option>
+        </select>
+      </div>
+      <a class="diag-row data" data-zone-data="" href="#" target="_blank" rel="noopener">
+        <svg class="i i-sm" viewBox="0 0 24 24"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
+        <span>Get Zone Data (raw)</span>
+        <svg class="i i-sm" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+      </a>
+    </div>
+  </details>
 </div>
 
 <div id="settings-view" style="display:none;">
@@ -613,6 +655,10 @@ const DIAL_CIRCUMFERENCE = 653.5;
 // early because renderZones()/updateLinks() already run during initial page
 // load, before the rest of the live-polling section below is reached.
 let openZoneId = null;
+// True once the very first refreshState() call (triggered on page load) has
+// resolved, success or failure -- gates the .app-loading shimmer, which is
+// only meant to cover that first read, not every 15s auto-refresh after.
+let firstLoadDone = false;
 function updateDialRing(ringId, temp, isOn) {
   const ring = document.getElementById(ringId);
   if (!ring) return;
@@ -1037,6 +1083,27 @@ async function refreshState() {
       // grace window, even though onBtn itself correctly held its state.
       const tile = onBtn ? onBtn.closest('.zone-tile') : null;
       if (tile) tile.classList.toggle('on', !!(onBtn && onBtn.classList.contains('active')));
+      // Ties the tile's icon color to the same gradient the dial uses, so
+      // the dashboard reads as one coherent temp language instead of two.
+      // Only the OFF-state icon rule actually uses these (see the CSS) --
+      // .on keeps its flat white-on-accent treatment, since on/off stays
+      // the primary signal here. Guarded the same way every other
+      // parseFloat() in this file is (updateDialRing, the temp displays):
+      // an unparseable desiredTemp (present-but-empty/non-numeric tag) must
+      // not reach tempToColor(), because a NaN component makes it return
+      // "rgb(NaN, NaN, NaN)" -- an invalid custom-property value. Per the
+      // CSS custom-properties spec, an *invalid* var() value does NOT fall
+      // back to the var()'s second argument (that fallback only applies
+      // when the property is undefined) -- it makes the property invalid
+      // at computed-value time instead, so background/color would resolve
+      // to transparent/inherited-black instead of --card-2/--muted,
+      // leaving the icon looking broken rather than merely un-tinted.
+      const parsedDesiredTemp = parseFloat(desiredTemp);
+      if (tile && desiredTemp !== null && !Number.isNaN(parsedDesiredTemp)) {
+        const tint = tempToColor(parsedDesiredTemp);
+        tile.style.setProperty('--zone-temp-color', tint);
+        tile.style.setProperty('--zone-temp-tint', tint.replace('rgb(', 'rgba(').replace(')', ', 0.18)'));
+      }
 
       // Same helper as every other value write, rather than a bespoke
       // focus-only check: this select is not just a readout, its value is
@@ -1081,12 +1148,22 @@ async function refreshState() {
 
   const time = new Date().toLocaleTimeString();
   const statusEl = document.getElementById('live-poll-status');
+  const dot = document.getElementById('live-dot');
   if (okCount > 0 && !lastError) {
     statusEl.textContent = `Reflecting live state — last updated ${time}.`;
+    if (dot) dot.className = 'live-dot ok';
   } else if (okCount > 0 && lastError) {
     statusEl.textContent = `Partially reflecting live state (some requests failed) — last updated ${time}.`;
+    if (dot) dot.className = 'live-dot partial';
   } else {
     statusEl.textContent = `Couldn't read current state as of ${time}: ${describeFetchError(lastError)}`;
+    if (dot) dot.className = 'live-dot error';
+  }
+  // Only the very first read (page-load) is behind the shimmer -- later
+  // auto-refreshes/manual reads update state in place without it.
+  if (!firstLoadDone) {
+    firstLoadDone = true;
+    document.body.classList.remove('app-loading');
   }
 }
 
