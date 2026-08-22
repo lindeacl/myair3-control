@@ -172,7 +172,17 @@
   /* ---- Dial (shared by the central control and Zone Detail) ---- */
   .dial-wrap { position: relative; width: 246px; height: 246px; margin: 0 auto 16px; }
   .dial-ring-svg { position: absolute; inset: 0; transform: rotate(-90deg); pointer-events: none; }
-  .dial-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+  /* pointer-events:none because this box spans the full dial (inset:0) for
+     centering purposes, but paints AFTER (on top of) the +/- edge buttons in
+     DOM order -- without this, its invisible flex gutter steals taps on
+     whichever portion of each edge button falls inside this box's bounds,
+     making them feel unreliable/"sticky" on a real touchscreen. No test had
+     ever clicked these buttons before this bug shipped, which is why it got
+     past review undetected -- see the regression test in
+     e2e/aircon-control.spec.js ("dial +/- buttons are clickable...").
+     Re-enabled on the one real child that needs to stay tappable. */
+  .dial-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; pointer-events: none; }
+  .dial-center .icon-btn { pointer-events: auto; }
   .dial-temp { font-size: 52px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
   .dial-unit { font-size: 20px; color: var(--muted); font-weight: 600; }
   .dial-caption { color: var(--muted); font-size: 11.5px; text-align: center; padding: 0 24px; line-height: 1.4; margin-bottom: 16px; }

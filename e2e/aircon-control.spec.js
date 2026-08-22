@@ -438,3 +438,37 @@ test('native-only: Get System Data shows raw XML inline instead of navigating', 
   await page.locator('#settings-close').click();
   await expect(sheet).toBeHidden();
 });
+
+// Regression test for the dial +/- buttons feeling "sticky, hardly works" on
+// a real device: .dial-center is an absolutely-positioned, full-size
+// (inset:0) flex container that exists purely to center the temp digits/
+// confirm button, and it painted AFTER (on top of) the .dial-edge +/-
+// buttons in DOM order. Without pointer-events:none, its transparent
+// flex-gutter silently intercepted taps on whichever portion of each edge
+// button it overlapped -- invisible to a mouse-driven .fill()-based test,
+// but real on a touchscreen (confirmed via elementFromPoint hit-testing).
+// Playwright's .click() does its own actionability/interceptability check
+// and would have caught this if any test had ever clicked these buttons --
+// this is that test, for both the central dial and the Zone Detail dial,
+// which share the same .dial-center/.dial-edge CSS classes.
+test('dial +/- buttons are clickable and not obscured by .dial-center', async ({ page }) => {
+  await mockController(page);
+  await page.goto('/index.html');
+
+  const centralInput = page.locator('#centralTemp');
+  await expect(centralInput).toHaveValue('22');
+  await page.locator('#main-view .dial-edge.plus').click();
+  await expect(centralInput).toHaveValue('22.5');
+  await page.locator('#main-view .dial-edge.minus').click();
+  await expect(centralInput).toHaveValue('22.0');
+
+  await page.locator('[data-zone-open="2"]').click();
+  await expect(page.locator('#zone-view')).toBeVisible();
+
+  const zoneInput = page.locator('[data-zone-temp-input]');
+  await expect(zoneInput).toHaveValue('22');
+  await page.locator('#zone-view .dial-edge.plus').click();
+  await expect(zoneInput).toHaveValue('22.5');
+  await page.locator('#zone-view .dial-edge.minus').click();
+  await expect(zoneInput).toHaveValue('22.0');
+});
