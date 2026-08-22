@@ -213,12 +213,58 @@ test('a failed command releases its grace window so the next refresh corrects th
 test('connection settings persist across reload via localStorage', async ({ page }) => {
   await mockController(page);
   await page.goto('/index.html');
-  await page.locator('#connection-details summary').click();
+  await page.locator('#settings-open').click();
   await page.locator('#ip').fill('10.0.0.50');
   await page.locator('#ip').dispatchEvent('input');
   await page.reload();
-  await page.locator('#connection-details summary').click();
+  await page.locator('#settings-open').click();
   await expect(page.locator('#ip')).toHaveValue('10.0.0.50');
+});
+
+test('settings screen opens and closes without navigating away', async ({ page }) => {
+  await mockController(page);
+  await page.goto('/index.html');
+  const startUrl = page.url();
+  const mainHeading = page.locator('h1', { hasText: 'MyAir3' });
+  const settingsHeading = page.locator('h1', { hasText: 'Settings' });
+
+  await expect(page.locator('#main-view')).toBeVisible();
+  await expect(page.locator('#settings-view')).toBeHidden();
+  await expect(mainHeading).toBeVisible();
+  await expect(settingsHeading).toBeHidden();
+
+  await page.locator('#settings-open').click();
+  await expect(page.locator('#settings-view')).toBeVisible();
+  await expect(page.locator('#main-view')).toBeHidden();
+  // The regression this guards against: the "MyAir3" header lives outside
+  // both view containers, so it's easy to leave it always-visible and end
+  // up with both headers stacked on the Settings screen -- toBeHidden()
+  // on #main-view alone doesn't catch that, since the header was never
+  // inside #main-view in the broken version.
+  await expect(settingsHeading).toBeVisible();
+  await expect(mainHeading).toBeHidden();
+
+  await page.locator('#settings-close').click();
+  await expect(page.locator('#main-view')).toBeVisible();
+  await expect(page.locator('#settings-view')).toBeHidden();
+  await expect(mainHeading).toBeVisible();
+  await expect(settingsHeading).toBeHidden();
+  expect(page.url()).toBe(startUrl);
+});
+
+// Settings is the only screen where the controller IP/port/password/zone
+// count can change, so whatever the main screen last read can be stale or
+// aimed at the wrong device the moment you come back. Auto-refresh defaults
+// to OFF, so without a re-read on return there is no correction at all until
+// the app is backgrounded and reopened.
+test('returning from settings re-reads system state', async ({ page }) => {
+  await mockController(page);
+  await page.goto('/index.html');
+  await page.locator('#settings-open').click();
+
+  const refreshed = page.waitForRequest((req) => req.url().includes('/getSystemData'), { timeout: 3000 });
+  await page.locator('#settings-close').click();
+  await refreshed;
 });
 
 test('mode buttons (Cool/Heat/Fan) send silently and show selected', async ({ page }) => {
@@ -281,11 +327,18 @@ test('native-only: Get System Data shows raw XML inline instead of navigating', 
   await page.goto('/index.html');
 
   const startUrl = page.url();
-  await page.locator('#connection-details summary').click();
+  await page.locator('#settings-open').click();
   await page.locator('#link-status').click();
 
   const sheet = page.locator('#raw-output-sheet');
   await expect(sheet).toBeVisible();
   await expect(page.locator('#raw-output')).toContainText('<systemData>');
   expect(page.url()).toBe(startUrl); // must not have navigated to the raw XML like the web fallback does
+
+  // The sheet is a page-level fixed overlay, outside both view containers, and
+  // the only thing that opens it (.data links) lives on the Settings screen.
+  // Leaving it up when the view changes strands raw XML over the main control
+  // screen with nothing on screen that produced it.
+  await page.locator('#settings-close').click();
+  await expect(sheet).toBeHidden();
 });

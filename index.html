@@ -144,6 +144,27 @@
   }
   a.icon-btn.confirm { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 
+  /* Circular nav buttons (open/close Settings) -- visually distinct from the
+     square-ish icon-btn steppers so navigation chrome reads differently
+     from in-content controls. Plain <button>, not <a>, on purpose: this
+     project has already shipped the "anchor falls through to raw
+     navigation" bug twice (zone On/Off, command buttons) -- a button has
+     no default navigation behavior to fall through to. */
+  button.nav-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--card-2);
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex: 0 0 auto;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   .cmd.pending { opacity: 0.5; }
   .cmd.sent { box-shadow: 0 0 0 2px var(--success); }
 
@@ -152,7 +173,7 @@
   .stat-line .label { font-size: 12px; color: var(--muted); }
   .note { color: var(--muted); font-size: 11.5px; margin-top: 6px; line-height: 1.4; }
 
-  /* details/summary used for collapsible Connection panel + each zone card */
+  /* details/summary used for the collapsible Live refresh panel + each zone card */
   details { border: 1px solid var(--border); border-radius: 16px; background: var(--card); margin-bottom: 12px; overflow: hidden; }
   details > summary {
     list-style: none;
@@ -219,30 +240,16 @@
   <span id="install-text"></span>
 </div>
 
+<div id="main-view">
 <header>
   <div>
     <h1>MyAir3</h1>
     <div class="sub">Live &middot; commands send silently</div>
   </div>
+  <button type="button" class="nav-btn" id="settings-open" aria-label="Open settings">
+    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 0 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 0 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15z"/></svg>
+  </button>
 </header>
-
-<details id="connection-details">
-  <summary><span>⚙️</span><span class="zone-summary-name">Connection</span><span class="chev">›</span></summary>
-  <div class="details-body">
-    <label for="ip">Controller IP</label>
-    <input id="ip" value="192.168.1.192">
-    <label for="port">Port</label>
-    <input id="port" value="2025">
-    <label for="password">Password</label>
-    <input id="password" value="password">
-    <label for="zones">Number of zones</label>
-    <input id="zones" type="number" min="1" max="16" value="3">
-    <div class="row">
-      <a class="pill standalone data grow" id="link-status" href="#" target="_blank" rel="noopener">Get System Data</a>
-      <a class="pill standalone data grow" id="link-login" href="#" target="_blank" rel="noopener">Login</a>
-    </div>
-  </div>
-</details>
 
 <div class="card">
   <div class="card-title">⏻ System</div>
@@ -306,6 +313,34 @@
     <small class="foot-status" id="live-poll-status">Reading current state…</small>
   </div>
 </details>
+</div>
+
+<div id="settings-view" style="display:none;">
+  <header style="margin-bottom:14px;">
+    <div class="row" style="align-items:center; gap:12px; margin-top:0;">
+      <button type="button" class="nav-btn" id="settings-close" aria-label="Back">
+        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
+      <h1>Settings</h1>
+    </div>
+  </header>
+
+  <div class="card">
+    <div class="card-title">Connection</div>
+    <label for="ip">Controller IP</label>
+    <input id="ip" value="192.168.1.192">
+    <label for="port">Port</label>
+    <input id="port" value="2025">
+    <label for="password">Password</label>
+    <input id="password" value="password">
+    <label for="zones">Number of zones</label>
+    <input id="zones" type="number" min="1" max="16" value="3">
+    <div class="row">
+      <a class="pill standalone data grow" id="link-status" href="#" target="_blank" rel="noopener">Get System Data</a>
+      <a class="pill standalone data grow" id="link-login" href="#" target="_blank" rel="noopener">Login</a>
+    </div>
+  </div>
+</div>
 
 <div id="raw-output-sheet">
   <div class="sheet-head">
@@ -554,8 +589,9 @@ document.addEventListener('click', (e) => {
   input.dispatchEvent(new Event('input', { bubbles: true }));
 });
 
-// Light haptic when expanding/collapsing a <details> card (Connection panel,
-// each zone). Skips clicks on a .cmd element inside the summary (the zone
+// Light haptic when expanding/collapsing a <details> card (Live refresh,
+// each zone -- Connection is no longer one of these; it moved to its own
+// Settings screen). Skips clicks on a .cmd element inside the summary (the zone
 // On/Off pills) since those already get their own haptic from the .cmd
 // listener below -- without this guard, tapping On/Off would double-buzz.
 document.addEventListener('click', (e) => {
@@ -899,6 +935,38 @@ document.addEventListener('click', async (e) => {
 document.getElementById('raw-output-close').addEventListener('click', () => {
   haptic('light');
   document.getElementById('raw-output-sheet').style.display = 'none';
+});
+
+// ---- screen navigation (main <-> settings) ----
+// Every switch goes through one helper so a screen added later can't
+// half-implement the transition. #raw-output-sheet is a page-level fixed
+// overlay that deliberately sits OUTSIDE both view containers (it has to be
+// able to cover whichever view is showing), which means nothing hides it
+// when the view underneath changes: open it from Settings' "Get System
+// Data", tap Back, and the raw XML stays pinned over the main control
+// screen with nothing on screen that produced it. Reset it here rather than
+// in each handler, so that stays true for the next screen too.
+const VIEW_IDS = ['main-view', 'settings-view'];
+function showView(id) {
+  document.getElementById('raw-output-sheet').style.display = 'none';
+  VIEW_IDS.forEach(v => {
+    document.getElementById(v).style.display = v === id ? '' : 'none';
+  });
+}
+document.getElementById('settings-open').addEventListener('click', () => {
+  haptic('light');
+  showView('settings-view');
+});
+document.getElementById('settings-close').addEventListener('click', () => {
+  haptic('light');
+  showView('main-view');
+  // Settings is the only place the controller IP/port/password/zone count
+  // changes, so what the main screen last read may be stale or from the
+  // wrong device. Auto-refresh defaults to OFF, so without this there's no
+  // re-read at all until the app is backgrounded and reopened. Fire-and-
+  // forget matches every other refreshState() call site; it handles its own
+  // errors and reports them on the live-poll status line.
+  refreshState();
 });
 
 async function sendCommand(link) {
