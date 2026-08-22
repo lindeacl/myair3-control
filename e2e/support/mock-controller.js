@@ -48,7 +48,14 @@ export async function mockController(page, { staleGetSystemData = false, delayMs
     }
     if (path === '/getZoneData') {
       const z = params.get('zone');
-      const zs = staleGetSystemData ? staleSnapshot.zones[z] : state.zones[z];
+      // Falls back to a default reading for a zone number beyond the 3
+      // seeded above (e.g. a test driving #zones up toward its max of 16)
+      // instead of throwing on the undefined lookup -- a thrown error here
+      // fails the whole route handler, which surfaces as a hard Playwright
+      // test failure rather than the ordinary failed-fetch a real unmocked
+      // zone would produce.
+      const defaultZone = { setting: '0', userPercentSetting: '80', desiredTemp: '22', actualTemp: '20' };
+      const zs = (staleGetSystemData ? staleSnapshot.zones[z] : state.zones[z]) || defaultZone;
       return {
         contentType: 'application/xml',
         body: `<zoneData><setting>${zs.setting}</setting><userPercentSetting>${zs.userPercentSetting}</userPercentSetting><desiredTemp>${zs.desiredTemp}</desiredTemp><actualTemp>${zs.actualTemp}</actualTemp></zoneData>`,

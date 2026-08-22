@@ -510,3 +510,38 @@ test('dial +/- buttons are clickable and not obscured by .dial-center', async ({
   await page.locator('#zone-view .dial-edge.minus').click();
   await expect(zoneInput).toHaveValue('22.0');
 });
+
+// Regression test for the high-zone-count edge case the fixed-row zone
+// layout surfaced: .zone-tile is `flex: 1 1 0` with no min-width floor would
+// let a tile shrink narrower than its own .zone-tile-icon (a fixed 28px box),
+// pushing the icon's box past the tile's own right edge and into the next
+// tile's clickable area -- a real hit-test overlap, not just a look, since
+// the icon sits inside .zone-tile-main's data-zone-open click target. The
+// "no horizontal scroll" test above only ever renders the default 3 zones,
+// which stay comfortably wide, so it can't catch this; this test drives the
+// #zones setting to 16 (the field's own max) to reproduce the width this
+// bug actually needs. Verified fail-before/pass-after by temporarily setting
+// .zone-tile's min-width to 0.
+test('zone tile icons never spill past their own tile into the next one at high zone counts', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.addInitScript(() => {
+    localStorage.setItem('connSettings', JSON.stringify({ ip: '192.168.1.192', port: '2025', password: 'password', zones: '16' }));
+  });
+  await mockController(page);
+  await page.goto('/index.html');
+
+  const tiles = page.locator('#zone-container .zone-tile');
+  await expect(tiles).toHaveCount(16);
+
+  const overflows = await page.evaluate(() => {
+    return [...document.querySelectorAll('#zone-container .zone-tile')].map((tile) => {
+      const tileRect = tile.getBoundingClientRect();
+      const iconRect = tile.querySelector('.zone-tile-icon').getBoundingClientRect();
+      // How far the icon's box extends past its own tile's right edge.
+      return iconRect.right - tileRect.right;
+    });
+  });
+  for (const overflow of overflows) {
+    expect(overflow).toBeLessThanOrEqual(0.5);
+  }
+});
