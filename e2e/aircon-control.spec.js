@@ -14,7 +14,45 @@ test('zones render on load', async ({ page }) => {
   await seedConnSettings(page);
   await mockController(page);
   await page.goto('/index.html');
-  await expect(page.locator('#zone-container details')).toHaveCount(3);
+  await expect(page.locator('#zone-container .zone-tile')).toHaveCount(3);
+});
+
+// Regression test for the dashboard-redesign request: the zone row used to
+// be a fixed-width horizontal-scroll strip (flex: 0 0 112px tiles inside an
+// overflow-x: auto container); it's now a plain evenly-split row that must
+// never scroll or clip content, at the real mobile width this was reported
+// against (375px -- the default Playwright viewport is 1280x720 and would
+// not have caught either the original scroll strip or the truncation
+// regression this fix also had to correct along the way).
+test('zone row fills the width evenly with no horizontal scroll at mobile width', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await seedConnSettings(page);
+  await mockController(page);
+  await page.goto('/index.html');
+
+  const container = page.locator('#zone-container');
+  await expect(container.locator('.zone-tile')).toHaveCount(3);
+
+  // The row itself must not overflow its own box -- i.e. no horizontal
+  // scrollbar, whatever CSS produces the layout.
+  const overflow = await container.evaluate((el) => el.scrollWidth - el.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+
+  // Each tile's full name must be visible (not clipped by an ellipsis or
+  // any other overflow:hidden truncation) -- this is what the earlier
+  // white-space:nowrap + text-overflow:ellipsis regression broke.
+  const nameOverflows = await container.locator('.zone-tile-name').evaluateAll(
+    (nodes) => nodes.map((n) => n.scrollWidth - n.clientWidth)
+  );
+  for (const delta of nameOverflows) {
+    expect(delta).toBeLessThanOrEqual(1);
+  }
+
+  // And the visible text must be the untruncated default names, not a
+  // "MAIN BED..." style cutoff.
+  await expect(container.locator('.zone-tile-name').nth(0)).toHaveText('MAIN BEDROOM');
+  await expect(container.locator('.zone-tile-name').nth(1)).toHaveText('TK BEDROOM');
+  await expect(container.locator('.zone-tile-name').nth(2)).toHaveText('SPARE BEDROO');
 });
 
 // Regression test for the bug where a zone's On/Off pill (inside <summary>,
@@ -125,6 +163,34 @@ test('power On button stays selected even if a refresh reads stale state', async
   await expect(onLink).toHaveClass(/active/);
 });
 
+// Same bug class again, but for the "Unit is ON/OFF..." caption below the
+// dial -- a fifth mirror of link-on's protected state, found by a review of
+// this fix's port into the sibling ios-app repo: it still read the raw
+// airconOnOff response instead of link-on's already-protected classList, so
+// it could show "Unit is OFF" while the Power button right above it
+// correctly still showed ON.
+test('the "Unit is ON/OFF" caption matches the Power button even if a refresh reads stale state', async ({ page }) => {
+  await mockController(page, { staleGetSystemData: true });
+  await page.goto('/index.html');
+
+  const note = page.locator('#central-state-note');
+  await expect(note).toContainText('Unit is OFF'); // load-time refresh reflects the unit: off
+
+  const onLink = page.locator('#link-on');
+  const requestPromise = page.waitForRequest((req) => req.url().includes('/setSystemData') && req.url().includes('airconOnOff=1'));
+  await onLink.click();
+  await requestPromise;
+
+  // Give the app's internal 900ms delay + refreshState() call time to run
+  // against the stale (never-catches-up) snapshot -- without the fix, this
+  // is where the caption would flip back to "OFF" even though the button
+  // stays ON.
+  await page.waitForTimeout(1500);
+
+  await expect(onLink).toHaveClass(/active/);
+  await expect(note).toContainText('Unit is ON');
+});
+
 // Same bug class, zone On/Off variant: refreshState() sets these via a
 // direct classList.toggle() rather than setActive(), so it's a distinct
 // code path that needs its own coverage even though the fix is the same.
@@ -173,7 +239,7 @@ test("a zone's on/off select holds the setting its command just sent even if a r
   await mockController(page, { staleGetSystemData: true });
   await page.goto('/index.html');
 
-  await page.locator('[data-zone-title-name="2"]').click(); // expand zone 2's card
+  await page.locator('[data-zone-title-name="2"]').click(); // opens zone 2's detail screen
   const settingSelect = page.locator('[data-zone-setting="2"]');
   await expect(settingSelect).toHaveValue('0'); // load-time refresh reflects the unit: zone 2 is off
 
@@ -185,6 +251,32 @@ test("a zone's on/off select holds the setting its command just sent even if a r
   await page.waitForTimeout(1500);
 
   await expect(settingSelect).toHaveValue('1');
+});
+
+// Same bug class as the select test above, but for the Zone Detail "Zone
+// state" stat card -- a READ-ONLY mirror of that same select's value. The
+// select itself is grace-protected (see the test above), but the stat card
+// next to it is painted straight from the network response with no grace
+// check, so it can snap back to "Off" while the select underneath still
+// correctly reads "On" -- the same "didn't take" symptom in a different
+// element, same class as central-temp-display / zone-percent-display-val.
+test("the zone detail 'Zone state' stat card holds the setting its command just sent even if a refresh reads stale state", async ({ page }) => {
+  await mockController(page, { staleGetSystemData: true });
+  await page.goto('/index.html');
+
+  await page.locator('[data-zone-title-name="2"]').click(); // opens zone 2's detail screen
+  const stateDisplay = page.locator('#zone-state-display');
+  await expect(stateDisplay).toHaveText('Off'); // load-time refresh reflects the unit: zone 2 is off
+
+  const settingSelect = page.locator('[data-zone-setting="2"]');
+  await settingSelect.selectOption('1');
+  const requestPromise = page.waitForRequest((req) => req.url().includes('/setZoneData') && req.url().includes('zone=2') && req.url().includes('zoneSetting=1'));
+  await page.locator('[data-zone-temp-link="2"]').click();
+  await requestPromise;
+
+  await page.waitForTimeout(1500);
+
+  await expect(stateDisplay).toHaveText('On');
 });
 
 // The grace window deliberately blocks refreshState() from correcting an
@@ -205,7 +297,7 @@ test('a failed command releases its grace window so the next refresh corrects th
   // Highlight went on optimistically, but the unit never got the command.
   // Flipping auto-refresh on runs refreshState() immediately; it must be
   // allowed to clear the highlight rather than being held off for 5s.
-  await page.locator('.zone-summary-name', { hasText: 'Live refresh' }).click(); // expand the card holding the toggle
+  await page.locator('#settings-open').click(); // Live Refresh now lives on the Settings screen
   await page.locator('#live-poll-toggle').check();
   await expect(page.locator('#link-on')).not.toHaveClass(/active/, { timeout: 3000 });
 });
@@ -265,6 +357,48 @@ test('returning from settings re-reads system state', async ({ page }) => {
   const refreshed = page.waitForRequest((req) => req.url().includes('/getSystemData'), { timeout: 3000 });
   await page.locator('#settings-close').click();
   await refreshed;
+});
+
+test('zone detail opens and closes without navigating away', async ({ page }) => {
+  await mockController(page);
+  await page.goto('/index.html');
+  const startUrl = page.url();
+
+  await expect(page.locator('#main-view')).toBeVisible();
+  await expect(page.locator('#zone-view')).toBeHidden();
+
+  await page.locator('[data-zone-open="2"]').click();
+  await expect(page.locator('#zone-view')).toBeVisible();
+  await expect(page.locator('#main-view')).toBeHidden();
+  await expect(page.locator('#zone-view-name')).toHaveText('TK BEDROOM');
+
+  await page.locator('#zone-back').click();
+  await expect(page.locator('#main-view')).toBeVisible();
+  await expect(page.locator('#zone-view')).toBeHidden();
+  expect(page.url()).toBe(startUrl);
+});
+
+// Same regression class as the Settings/native-only sheet-leak checks: the
+// sheet is a page-level overlay outside every view container, so nothing
+// hides it automatically when Zone Detail's back button changes the view.
+test('opening a zone does not leak the raw-output sheet across the transition', async ({ page }) => {
+  const nativeBase = 'http://192.168.1.192:2025';
+  await page.addInitScript(() => {
+    window.Capacitor = {
+      isNativePlatform: () => true,
+      Plugins: { Haptics: { impact: async () => {}, notification: async () => {} } },
+    };
+  });
+  await mockController(page, { nativeBase });
+  await page.goto('/index.html');
+
+  await page.locator('[data-zone-open="1"]').click();
+  await page.locator('[data-zone-data="1"]').click();
+  const sheet = page.locator('#raw-output-sheet');
+  await expect(sheet).toBeVisible();
+
+  await page.locator('#zone-back').click();
+  await expect(sheet).toBeHidden();
 });
 
 test('mode buttons (Cool/Heat/Fan) send silently and show selected', async ({ page }) => {
@@ -341,4 +475,73 @@ test('native-only: Get System Data shows raw XML inline instead of navigating', 
   // screen with nothing on screen that produced it.
   await page.locator('#settings-close').click();
   await expect(sheet).toBeHidden();
+});
+
+// Regression test for the dial +/- buttons feeling "sticky, hardly works" on
+// a real device: .dial-center is an absolutely-positioned, full-size
+// (inset:0) flex container that exists purely to center the temp digits/
+// confirm button, and it painted AFTER (on top of) the .dial-edge +/-
+// buttons in DOM order. Without pointer-events:none, its transparent
+// flex-gutter silently intercepted taps on whichever portion of each edge
+// button it overlapped -- invisible to a mouse-driven .fill()-based test,
+// but real on a touchscreen (confirmed via elementFromPoint hit-testing).
+// Playwright's .click() does its own actionability/interceptability check
+// and would have caught this if any test had ever clicked these buttons --
+// this is that test, for both the central dial and the Zone Detail dial,
+// which share the same .dial-center/.dial-edge CSS classes.
+test('dial +/- buttons are clickable and not obscured by .dial-center', async ({ page }) => {
+  await mockController(page);
+  await page.goto('/index.html');
+
+  const centralInput = page.locator('#centralTemp');
+  await expect(centralInput).toHaveValue('22');
+  await page.locator('#main-view .dial-edge.plus').click();
+  await expect(centralInput).toHaveValue('22.5');
+  await page.locator('#main-view .dial-edge.minus').click();
+  await expect(centralInput).toHaveValue('22.0');
+
+  await page.locator('[data-zone-open="2"]').click();
+  await expect(page.locator('#zone-view')).toBeVisible();
+
+  const zoneInput = page.locator('[data-zone-temp-input]');
+  await expect(zoneInput).toHaveValue('22');
+  await page.locator('#zone-view .dial-edge.plus').click();
+  await expect(zoneInput).toHaveValue('22.5');
+  await page.locator('#zone-view .dial-edge.minus').click();
+  await expect(zoneInput).toHaveValue('22.0');
+});
+
+// Regression test for the high-zone-count edge case the fixed-row zone
+// layout surfaced: .zone-tile is `flex: 1 1 0` with no min-width floor would
+// let a tile shrink narrower than its own .zone-tile-icon (a fixed 28px box),
+// pushing the icon's box past the tile's own right edge and into the next
+// tile's clickable area -- a real hit-test overlap, not just a look, since
+// the icon sits inside .zone-tile-main's data-zone-open click target. The
+// "no horizontal scroll" test above only ever renders the default 3 zones,
+// which stay comfortably wide, so it can't catch this; this test drives the
+// #zones setting to 16 (the field's own max) to reproduce the width this
+// bug actually needs. Verified fail-before/pass-after by temporarily setting
+// .zone-tile's min-width to 0.
+test('zone tile icons never spill past their own tile into the next one at high zone counts', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.addInitScript(() => {
+    localStorage.setItem('connSettings', JSON.stringify({ ip: '192.168.1.192', port: '2025', password: 'password', zones: '16' }));
+  });
+  await mockController(page);
+  await page.goto('/index.html');
+
+  const tiles = page.locator('#zone-container .zone-tile');
+  await expect(tiles).toHaveCount(16);
+
+  const overflows = await page.evaluate(() => {
+    return [...document.querySelectorAll('#zone-container .zone-tile')].map((tile) => {
+      const tileRect = tile.getBoundingClientRect();
+      const iconRect = tile.querySelector('.zone-tile-icon').getBoundingClientRect();
+      // How far the icon's box extends past its own tile's right edge.
+      return iconRect.right - tileRect.right;
+    });
+  });
+  for (const overflow of overflows) {
+    expect(overflow).toBeLessThanOrEqual(0.5);
+  }
 });
