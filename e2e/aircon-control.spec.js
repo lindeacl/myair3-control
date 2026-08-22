@@ -240,6 +240,7 @@ test("a zone's on/off select holds the setting its command just sent even if a r
   await page.goto('/index.html');
 
   await page.locator('[data-zone-title-name="2"]').click(); // opens zone 2's detail screen
+  await page.locator('.advanced-summary').click(); // the setting select lives under the collapsed Advanced disclosure
   const settingSelect = page.locator('[data-zone-setting="2"]');
   await expect(settingSelect).toHaveValue('0'); // load-time refresh reflects the unit: zone 2 is off
 
@@ -268,6 +269,7 @@ test("the zone detail 'Zone state' stat card holds the setting its command just 
   const stateDisplay = page.locator('#zone-state-display');
   await expect(stateDisplay).toHaveText('Off'); // load-time refresh reflects the unit: zone 2 is off
 
+  await page.locator('.advanced-summary').click(); // the setting select lives under the collapsed Advanced disclosure
   const settingSelect = page.locator('[data-zone-setting="2"]');
   await settingSelect.selectOption('1');
   const requestPromise = page.waitForRequest((req) => req.url().includes('/setZoneData') && req.url().includes('zone=2') && req.url().includes('zoneSetting=1'));
@@ -378,6 +380,23 @@ test('zone detail opens and closes without navigating away', async ({ page }) =>
   expect(page.url()).toBe(startUrl);
 });
 
+// Locks in the "de-emphasize admin bits" design intent: the zone setting
+// select and the raw-XML diagnostics link are debug/advanced tools, not
+// primary controls, so they stay tucked away until the viewer asks for them.
+test('zone detail Advanced controls are collapsed by default', async ({ page }) => {
+  await mockController(page);
+  await page.goto('/index.html');
+
+  await page.locator('[data-zone-open="1"]').click();
+  const details = page.locator('.advanced-details');
+  await expect(details).not.toHaveAttribute('open', '');
+  await expect(page.locator('[data-zone-setting]')).toBeHidden();
+
+  await page.locator('.advanced-summary').click();
+  await expect(details).toHaveAttribute('open', '');
+  await expect(page.locator('[data-zone-setting]')).toBeVisible();
+});
+
 // Same regression class as the Settings/native-only sheet-leak checks: the
 // sheet is a page-level overlay outside every view container, so nothing
 // hides it automatically when Zone Detail's back button changes the view.
@@ -393,6 +412,7 @@ test('opening a zone does not leak the raw-output sheet across the transition', 
   await page.goto('/index.html');
 
   await page.locator('[data-zone-open="1"]').click();
+  await page.locator('.advanced-summary').click(); // the diagnostics link lives under the collapsed Advanced disclosure
   await page.locator('[data-zone-data="1"]').click();
   const sheet = page.locator('#raw-output-sheet');
   await expect(sheet).toBeVisible();
@@ -544,4 +564,40 @@ test('zone tile icons never spill past their own tile into the next one at high 
   for (const overflow of overflows) {
     expect(overflow).toBeLessThanOrEqual(0.5);
   }
+});
+
+// Regression for the NaN-color defect found in review: tempToColor() has no
+// guard against a NaN input, and every OTHER parseFloat() call in this file
+// (updateDialRing, the temp displays) already falls back to a default
+// instead of feeding NaN through -- refreshState()'s new desiredTemp->tint
+// wiring skipped that guard. A NaN component makes tempToColor() return
+// "rgb(NaN, NaN, NaN)", an invalid CSS value; per the custom-properties
+// spec, an *invalid* var() value does NOT fall back to var()'s second
+// argument (only an *undefined* property does that) -- it makes the
+// property invalid at computed-value time, so
+// `background: var(--zone-temp-tint, var(--card-2))` resolves to
+// transparent instead of the intended default, leaving the icon looking
+// broken instead of merely un-tinted. Verified fail-before/pass-after by
+// temporarily removing the `!Number.isNaN(...)` guard.
+test('a zone with a non-numeric desiredTemp does not corrupt the tile icon color', async ({ page }) => {
+  const state = await mockController(page);
+  state.zones[1].desiredTemp = ''; // present-but-unparseable <desiredTemp>, as a malformed response might send
+  // Set up the wait BEFORE navigating -- refreshState()'s initial read is
+  // fire-and-forget (see the comment at its call site), so without this the
+  // assertions below could run before the mocked getZoneData response (and
+  // the DOM writes that depend on it) has actually landed, making the test
+  // pass even on a broken build purely by racing ahead of the bug.
+  const zone1Read = page.waitForResponse((res) => res.url().includes('/getZoneData') && res.url().includes('zone=1'));
+  await page.goto('/index.html');
+  await zone1Read;
+
+  const tintSet = await page.evaluate(() => {
+    const tile = document.querySelector('[data-zone-open="1"]').closest('.zone-tile');
+    return tile.style.getPropertyValue('--zone-temp-tint');
+  });
+  expect(tintSet).toBe(''); // guard skipped setting it -- icon keeps the default var(--card-2) look
+
+  const icon = page.locator('[data-zone-open="1"] .zone-tile-icon');
+  const bg = await icon.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(bg).not.toBe('rgba(0, 0, 0, 0)'); // would be transparent if the invalid var() had been set
 });
