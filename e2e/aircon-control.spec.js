@@ -187,6 +187,32 @@ test("a zone's on/off select holds the setting its command just sent even if a r
   await expect(settingSelect).toHaveValue('1');
 });
 
+// Same bug class as the select test above, but for the Zone Detail "Zone
+// state" stat card -- a READ-ONLY mirror of that same select's value. The
+// select itself is grace-protected (see the test above), but the stat card
+// next to it is painted straight from the network response with no grace
+// check, so it can snap back to "Off" while the select underneath still
+// correctly reads "On" -- the same "didn't take" symptom in a different
+// element, same class as central-temp-display / zone-percent-display-val.
+test("the zone detail 'Zone state' stat card holds the setting its command just sent even if a refresh reads stale state", async ({ page }) => {
+  await mockController(page, { staleGetSystemData: true });
+  await page.goto('/index.html');
+
+  await page.locator('[data-zone-title-name="2"]').click(); // opens zone 2's detail screen
+  const stateDisplay = page.locator('#zone-state-display');
+  await expect(stateDisplay).toHaveText('Off'); // load-time refresh reflects the unit: zone 2 is off
+
+  const settingSelect = page.locator('[data-zone-setting="2"]');
+  await settingSelect.selectOption('1');
+  const requestPromise = page.waitForRequest((req) => req.url().includes('/setZoneData') && req.url().includes('zone=2') && req.url().includes('zoneSetting=1'));
+  await page.locator('[data-zone-temp-link="2"]').click();
+  await requestPromise;
+
+  await page.waitForTimeout(1500);
+
+  await expect(stateDisplay).toHaveText('On');
+});
+
 // The grace window deliberately blocks refreshState() from correcting an
 // optimistic highlight for a few seconds. When the send is known to have
 // FAILED, though, that highlight is known-wrong, and holding the window

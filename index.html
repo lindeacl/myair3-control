@@ -952,11 +952,23 @@ async function refreshState() {
     if (centralDisplay && centralTempInput) {
       centralDisplay.innerHTML = (parseFloat(centralTempInput.value) || 0).toFixed(1) + '<span class="dial-unit">°</span>';
     }
-    updateDialRing('dial-ring', centralTempInput ? centralTempInput.value : null, onOff === '1');
+    // Read link-on's own (just-protected) classList rather than the raw
+    // onOff response -- same bug class as the grace-window checks above:
+    // painting straight from the fetch would let a display flash back to
+    // "off" during another control's grace window even though link-on
+    // correctly held "on". Read once and reuse for every mirror below so
+    // the ring and the caption never disagree with each other or with the
+    // button.
+    const centralOn = document.getElementById('link-on').classList.contains('active');
+    updateDialRing('dial-ring', centralTempInput ? centralTempInput.value : null, centralOn);
 
     const note = document.getElementById('central-state-note');
     if (note) {
-      const onOffLabel = onOff === '1' ? 'ON' : onOff === '0' ? 'OFF' : '?';
+      // Same fix as the ring above: derive the label from centralOn (the
+      // protected classList), not the raw onOff response, or this caption
+      // could show "Unit is OFF" while the button right above it correctly
+      // still shows ON.
+      const onOffLabel = centralOn ? 'ON' : (onOff === '0' ? 'OFF' : '?');
       note.textContent = `Unit is ${onOffLabel}. Actual temp: ${centralActualTemp ?? '?'}°C.`;
     }
     okCount++;
@@ -989,8 +1001,12 @@ async function refreshState() {
       const offBtn = document.querySelector(`[data-zone-off="${z}"]`);
       setActiveEl(onBtn, setting === '1');
       setActiveEl(offBtn, setting === '0');
+      // Read back onBtn's own (just-protected) classList rather than the raw
+      // setting response -- same bug class as the dial-ring fix above: this
+      // tile could otherwise flash to the wrong color during onBtn's own
+      // grace window, even though onBtn itself correctly held its state.
       const tile = onBtn ? onBtn.closest('.zone-tile') : null;
-      if (tile) tile.classList.toggle('on', setting === '1');
+      if (tile) tile.classList.toggle('on', !!(onBtn && onBtn.classList.contains('active')));
 
       // Same helper as every other value write, rather than a bespoke
       // focus-only check: this select is not just a readout, its value is
@@ -1010,11 +1026,16 @@ async function refreshState() {
       if (String(z) === String(openZoneId)) {
         const zDisplay = document.getElementById('zone-temp-display');
         if (zDisplay && tempInput) zDisplay.innerHTML = (parseFloat(tempInput.value) || 0).toFixed(1) + '<span class="dial-unit">°</span>';
-        updateDialRing('zone-dial-ring', tempInput ? tempInput.value : null, setting === '1');
+        // Read the select's own (just-protected) value rather than the raw
+        // setting response, same bug class as above -- these two mirrors
+        // would otherwise flash back to stale during settingSelect's own
+        // grace window even though the select itself correctly held its value.
+        const zoneOn = settingSelect ? settingSelect.value : setting;
+        updateDialRing('zone-dial-ring', tempInput ? tempInput.value : null, zoneOn === '1');
         const stateDisplay = document.getElementById('zone-state-display');
         if (stateDisplay) {
-          stateDisplay.textContent = setting === '1' ? 'On' : setting === '0' ? 'Off' : '?';
-          stateDisplay.className = 'stat-value ' + (setting === '1' ? 'state-on' : setting === '0' ? 'state-off' : '');
+          stateDisplay.textContent = zoneOn === '1' ? 'On' : zoneOn === '0' ? 'Off' : '?';
+          stateDisplay.className = 'stat-value ' + (zoneOn === '1' ? 'state-on' : zoneOn === '0' ? 'state-off' : '');
         }
       }
 
