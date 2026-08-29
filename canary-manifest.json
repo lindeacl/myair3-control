@@ -1,0 +1,54 @@
+{
+  "canaries": [
+    {
+      "id": "sqli-001",
+      "class": "injection surfaces",
+      "checklist_item": "injection surfaces",
+      "severity_expected": "Critical",
+      "lang_ext": "js",
+      "description": "Raw string interpolation into a SQL query instead of a parameterized query",
+      "buggy_snippet": "const rows = await db.query(`SELECT * FROM users WHERE email = '${email}'`);",
+      "clean_snippet": "const rows = await db.query('SELECT * FROM users WHERE email = $1', [email]);"
+    },
+    {
+      "id": "authz-001",
+      "class": "cross-tenant data leak",
+      "checklist_item": "correctness",
+      "severity_expected": "Critical",
+      "lang_ext": "js",
+      "description": "A query missing a tenant/org scoping clause — DEFECT_DISCIPLINE.md's own illustrative Rule 1 example",
+      "buggy_snippet": "const patient = await db.patient.findUnique({ where: { id: patientId } });",
+      "clean_snippet": "const patient = await db.patient.findUnique({ where: { id: patientId, tenantId: ctx.tenantId } });"
+    },
+    {
+      "id": "nplus1-001",
+      "class": "N+1 query",
+      "checklist_item": "N+1 queries",
+      "severity_expected": "Warning",
+      "lang_ext": "js",
+      "description": "A query inside a loop instead of a single batched fetch",
+      "buggy_snippet": "for (const order of orders) { order.customer = await db.customer.findUnique({ where: { id: order.customerId } }); }",
+      "clean_snippet": "const customerIds = orders.map(o => o.customerId); const customers = await db.customer.findMany({ where: { id: { in: customerIds } } }); const byId = Object.fromEntries(customers.map(c => [c.id, c]));"
+    },
+    {
+      "id": "race-001",
+      "class": "race condition — check-then-write on shared state",
+      "checklist_item": "race conditions",
+      "severity_expected": "Critical",
+      "lang_ext": "js",
+      "description": "A balance check followed by a separate write, with a gap an interleaved request can exploit — DEFECT_DISCIPLINE.md Rule 3's exact illustrative shape",
+      "buggy_snippet": "const account = await db.account.findUnique({ where: { id } }); if (account.balance >= amount) { await db.account.update({ where: { id }, data: { balance: account.balance - amount } }); }",
+      "clean_snippet": "await db.account.updateMany({ where: { id, balance: { gte: amount } }, data: { balance: { decrement: amount } } });"
+    },
+    {
+      "id": "nullcheck-001",
+      "class": "missing input validation",
+      "checklist_item": "input validation",
+      "severity_expected": "Warning",
+      "lang_ext": "js",
+      "description": "Accessing a nested property on a value that can be null/undefined per the function's own type signature",
+      "buggy_snippet": "function getShippingCity(order) { return order.shippingAddress.city; }",
+      "clean_snippet": "function getShippingCity(order) { return order.shippingAddress?.city ?? null; }"
+    }
+  ]
+}

@@ -1,11 +1,18 @@
 # Agent Governance Kit — portable across projects
 
-A drop-in code-review enforcement + model-topology setup for Claude Code projects.
-Extracted from the PharmaMed repo. Copy the portable files, adjust the marked bits.
+A drop-in code-review enforcement + model-topology setup for Claude Code
+projects. Framework- and language-agnostic — copy the portable files,
+adjust the marked bits for this project's actual stack.
 
 > ⚠️ **Never copy a project's `.claude/settings.json` `permissions` block between repos.**
 > It holds machine-specific paths and (in the source repo) a leaked plaintext DB
 > password. Copy ONLY the `hooks` block shown in step 3.
+
+**Retrofit-safe on an existing project:** the installer prepends the
+review-gate to an existing `.husky/pre-commit` rather than replacing it —
+your project's own mechanical gates (formatter, linter, whatever's already
+there) are kept, not clobbered. Same for `.claude/settings.json`'s `hooks`
+block: merged in, `permissions` and any other kit's entries left untouched.
 
 ---
 
@@ -13,20 +20,36 @@ Extracted from the PharmaMed repo. Copy the portable files, adjust the marked bi
 
 1. Copy `.claude/agents/code-reviewer.md` (step 1) — verbatim; tune `model:` / checklist.
 2. Copy `scripts/require-review.sh` (step 2) — `chmod +x scripts/require-review.sh`.
-3. Merge the `hooks` block (step 3) into the project's `.claude/settings.json`
-   (do NOT clobber its `permissions`).
-4. Install/replace `.husky/pre-commit` (step 4) — `chmod +x`. Keep the review-gate
-   block; keep only the mechanical gates whose npm scripts the project actually has.
-5. Wire husky: `git config core.hooksPath .husky` (or `npx husky init`).
-6. Add `.claude/.review-pass` to `.gitignore`.
-7. Add the two CLAUDE.md sections (step 5).
-8. (Optional) Add `scripts/check-dead-components.mjs` (step 6) with an EMPTY allowlist,
+3. Copy `scripts/check-diff-size.sh` (step 2b) — `chmod +x`. Enforces
+   `QUALITY_STANDARD.md` §5's review-size band (warns at 400 changed lines,
+   hard-blocks in CI above 1,000) — previously documented only, not gated.
+3b. **Test enforcement is now real, not a placeholder** (step 4's
+   `.husky/pre-commit`, "Test enforcement" block) — auto-detects
+   package.json/pytest/go/cargo and hard-blocks the commit on failure.
+   Verify it picked the right command for this project, or set
+   `.claude/test-command` to override. E2E stays a CI concern
+   (`CI_TEMPLATES.md`) — deliberately not run at commit time.
+4. Copy `scripts/lint-and-test.sh` (step 2c) — `chmod +x`. The `PostToolUse`
+   fast self-correction loop `QUALITY_STANDARD.md` §9 Tier 1 calls for —
+   distinct job from `require-review.sh`, runs after every `Edit`/`Write`
+   instead of before `git commit`. Edit the commands inside for this
+   project's actual lint/type/test scripts.
+5. Merge the `hooks` block (step 3) into the project's `.claude/settings.json`
+   (do NOT clobber its `permissions`) — note it now has BOTH a `PreToolUse`
+   and a `PostToolUse` entry.
+6. Install/replace `.husky/pre-commit` (step 4) — `chmod +x`. Keep the review-gate
+   and diff-size blocks; keep only the mechanical gates whose npm scripts the
+   project actually has.
+7. Wire husky: `git config core.hooksPath .husky` (or `npx husky init`).
+8. Add `.claude/.review-pass` to `.gitignore`.
+9. Add the two CLAUDE.md sections (step 5).
+10. (Optional) Add `scripts/check-dead-components.mjs` (step 6) with an EMPTY allowlist,
    and a `"lint:dead-components": "node scripts/check-dead-components.mjs"` npm script.
-9. (Recommended) Install `gitleaks` (`brew install gitleaks`) and add a
+11. (Recommended) Install `gitleaks` (`brew install gitleaks`) and add a
    `.gitleaks.toml` allowlist file (empty by default) — the pre-commit hook's
    secret-scan step runs automatically if it finds the binary, and warns
    loudly if it doesn't.
-10. Restart Claude Code so the `code-reviewer` agent is discoverable.
+12. Restart Claude Code so the `code-reviewer` agent is discoverable.
 
 Requires `jq` and `shasum` on PATH (both standard on macOS).
 
@@ -99,7 +122,101 @@ exit 0
 
 ---
 
-## 3. `.claude/settings.json` — merge ONLY this hooks block
+## 2b. `scripts/check-diff-size.sh`  (portable, verbatim — chmod +x)
+
+```bash
+#!/bin/bash
+# Enforces QUALITY_STANDARD.md §5's review-size band: 200-400 changed lines
+# gets 70-90% defect detection in review; above ~1,000 lines it falls to
+# ~28% (SmartBear/Cisco study). This was previously documented only — this
+# script is what makes it real.
+#
+# Local pre-commit: WARNS only (doesn't block a solo commit — splitting a
+# diff after the fact is disruptive and this is a judgment call, not a
+# security boundary). CI: pass --enforce to hard-block merges above the
+# 1,000-line cliff, where the data is unambiguous.
+#
+# Usage:
+#   scripts/check-diff-size.sh              # warn only, exit 0 always
+#   scripts/check-diff-size.sh --enforce     # exit 1 above the hard cutoff
+set -euo pipefail
+ENFORCE=false
+[ "${1:-}" = "--enforce" ] && ENFORCE=true
+
+WARN_LINES=400
+HARD_LINES=1000
+
+CHANGED=$(git diff --cached --numstat 2>/dev/null | awk '{add+=$1; del+=$2} END{print add+del+0}')
+[ -z "$CHANGED" ] && CHANGED=0
+
+if [ "$CHANGED" -gt "$HARD_LINES" ]; then
+  echo "❌ Diff is $CHANGED lines — over the $HARD_LINES-line cliff where review" >&2
+  echo "   detection drops to ~28% (SmartBear/Cisco data, QUALITY_STANDARD.md §5)." >&2
+  echo "   Split this into smaller, independently reviewable changes." >&2
+  [ "$ENFORCE" = true ] && exit 1
+  echo "   (local pre-commit: warning only — CI will hard-block this)" >&2
+elif [ "$CHANGED" -gt "$WARN_LINES" ]; then
+  echo "⚠️  Diff is $CHANGED lines — above the 200-400 line band where review" >&2
+  echo "   detection is highest (70-90%, QUALITY_STANDARD.md §5). Consider splitting." >&2
+else
+  echo "✅ Diff size: $CHANGED lines (within the 200-400 line high-detection band, or smaller)."
+fi
+exit 0
+```
+
+**Why this warns locally but only hard-blocks in CI:** review-size is a
+statistical detection-rate argument, not a correctness invariant like "tests
+pass" — a single large-but-mechanical change (a rename across 50 files,
+a generated-file update) can legitimately exceed the band without actually
+being harder to review. Treat the local warning as a prompt to think about
+splitting, and reserve the hard `--enforce` block for CI on the true
+1,000-line cliff, where the data stops being ambiguous.
+
+---
+
+## 2c. `scripts/lint-and-test.sh`  (PostToolUse — EDIT commands per project)
+
+```bash
+#!/bin/bash
+# PostToolUse hook: fast self-correction loop after every Edit/Write.
+# QUALITY_STANDARD.md §9 Tier 1 calls this out as a DIFFERENT job from
+# require-review.sh (PreToolUse, blocks git commit): this runs immediately
+# after a file changes and feeds failures back to the agent as a blocking
+# message it must address — a tight loop, not a merge gate.
+#
+# IMPORTANT: this does NOT undo the edit — the violation existed on disk
+# momentarily. It's a fast feedback loop, not a hard boundary. The hard
+# boundary is still require-review.sh + the git pre-commit hook.
+#
+# EDIT THE COMMANDS BELOW for this project's actual lint/type-check setup.
+# Keep it FAST (seconds, not minutes) — this runs after every single edit,
+# so a slow check here makes every Edit/Write tool call sluggish. Push
+# anything slow (full test suite, E2E) to the pre-commit/CI tiers instead.
+INPUT=$(cat)
+FILE=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
+[ -z "$FILE" ] && exit 0
+
+case "$FILE" in
+  *.ts|*.tsx)
+    npx tsc --noEmit "$FILE" 2>&1 | head -30
+    npx eslint "$FILE" 2>&1 | head -30
+    ;;
+  *.js|*.jsx)
+    npx eslint "$FILE" 2>&1 | head -30
+    ;;
+  *.py)
+    command -v ruff >/dev/null 2>&1 && ruff check "$FILE"
+    ;;
+  *) exit 0 ;;
+esac
+EXIT=$?
+[ $EXIT -ne 0 ] && echo "Fix the above before continuing — this file has a lint/type error." >&2
+exit $EXIT
+```
+
+---
+
+## 3. `.claude/settings.json` — merge this hooks block (BOTH PreToolUse and PostToolUse)
 
 ```json
 {
@@ -109,6 +226,14 @@ exit 0
         "matcher": "Bash",
         "hooks": [
           { "type": "command", "command": "./scripts/require-review.sh" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "./scripts/lint-and-test.sh" }
         ]
       }
     ]
@@ -158,12 +283,51 @@ else
   echo "⚠️  gitleaks not installed — secret-scan gate SKIPPED (install: brew install gitleaks)." >&2
 fi
 
-# ── Mechanical gates (ADJUST PER PROJECT — keep only scripts this repo has) ────
+# ── Diff-size gate (PORTABLE) — warns locally, CI hard-blocks (see script) ───
+./scripts/check-diff-size.sh
+
+# ── Test enforcement (PORTABLE — auto-detected, not a placeholder) ───────────
+# Runs whatever this project's own test entry point is: package.json's
+# "test" script (npm/pnpm/yarn, auto-detected via lockfile), pytest, go
+# test, or cargo test. A real hard block on failure via set -e above — an
+# earlier version of this doc left this as an "ADD your own tests here"
+# comment, which meant fresh installs enforced NOTHING test-related unless
+# someone remembered to fill it in. E2E/browser suites are deliberately NOT
+# run here (see CI_TEMPLATES.md) — same "don't gate every commit on a slow
+# check" reasoning as MUTATION_TESTING.md. Detection miss only warns, same
+# as the gitleaks gate above; a detected command that FAILS blocks for
+# real. Override: .claude/test-command (one line) skips auto-detection.
+if [ -f .claude/test-command ]; then
+  TEST_CMD=$(cat .claude/test-command)
+elif [ -f package.json ] && jq -e '.scripts.test' package.json >/dev/null 2>&1; then
+  if [ -f pnpm-lock.yaml ]; then TEST_CMD="pnpm test"
+  elif [ -f yarn.lock ]; then TEST_CMD="yarn test"
+  else TEST_CMD="npm test"
+  fi
+elif [ -f pyproject.toml ] || [ -f pytest.ini ] || [ -f setup.cfg ]; then
+  TEST_CMD="pytest"
+elif [ -f go.mod ]; then
+  TEST_CMD="go test ./..."
+elif [ -f Cargo.toml ]; then
+  TEST_CMD="cargo test"
+else
+  TEST_CMD=""
+fi
+
+if [ -n "$TEST_CMD" ]; then
+  echo "🧪 Pre-commit: running tests ($TEST_CMD)..."
+  eval "$TEST_CMD"
+else
+  echo "⚠️  No test command detected — tests are NOT being enforced." >&2
+  echo "   Set .claude/test-command with the exact command for this project." >&2
+fi
+
+# ── Additional mechanical gates (ADJUST PER PROJECT — stack-specific, NOT
+#    auto-wired the way test execution above is) ─────────────────────────────
 npx prettier --check "src/**/*.{ts,tsx,json}" --log-level warn
 npx tsc --noEmit
 npx eslint
 npx madge --circular --extensions ts,tsx src/
-npx vitest run --reporter=dot
 echo "✅ Pre-commit checks passed."
 ```
 

@@ -7,6 +7,10 @@
           {
             "type": "command",
             "command": "./scripts/check-after-edit.sh"
+          },
+          {
+            "type": "command",
+            "command": "./scripts/lint-and-test.sh"
           }
         ]
       }
@@ -34,6 +38,14 @@
           {
             "type": "command",
             "command": "./scripts/require-review.sh"
+          },
+          {
+            "type": "command",
+            "command": "./scripts/require-trend-audit.sh"
+          },
+          {
+            "type": "command",
+            "command": "./scripts/track-merge-for-audit.sh"
           }
         ]
       }

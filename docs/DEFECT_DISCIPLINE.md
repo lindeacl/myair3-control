@@ -6,6 +6,12 @@ project's `CLAUDE.md`, `CONTRIBUTING.md`, or engineering handbook, and put the
 checklist (§C) in the PR template so it's enforced at review time, not just read
 once.
 
+Applies identically to a brand-new project or one with a decade of
+history — every rule here governs how a *change* gets made, not the
+existing state of the codebase, so there's nothing to bootstrap or
+retrofit-adapt the way the coverage/density/mutation-score thresholds
+elsewhere in this pack need to be.
+
 > If you adopt only two, adopt **Rule 1** and **Rule 6** — between them they
 > account for most defects that get through a green pipeline.
 

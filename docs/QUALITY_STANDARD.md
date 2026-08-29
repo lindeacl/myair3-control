@@ -47,6 +47,8 @@ Review sizing, grounded in the SmartBear/Cisco study (2,500 reviews, 3.2M lines,
 
 **Rule for the agent:** after implementation, hand off to a separate agent context (or a human) briefed adversarially — "find defects in this, don't fix them" — before merge. Self-review by the same context that wrote the code does not count as review.
 
+**Enforced, not just documented:** `agent-governance-kit.md` ships `scripts/check-diff-size.sh`, wired into the pre-commit hook — it warns at 400 changed lines and hard-blocks (in CI; warns locally) above 1,000. See that kit for the script.
+
 ## 6. Defect feedback loop
 Every defect found in review or testing gets root-caused, not just patched. If the same class of defect could recur, the fix is: add a rule to this file (or the lint/static-analysis config) that would catch it mechanically next time — not just fix the one instance. This is what moves the trend line down over successive releases, not the individual fixes.
 
@@ -62,7 +64,15 @@ Track from day one:
 - Defects found post-release (field) ÷ KLOC — the number that actually validates the process; the others are leading indicators
 - Review size distribution over time — are diffs staying in the 200–400 line band, or drifting up
 
+**Implemented, not just prescribed:** `DEFECT_DENSITY_KIT.md`'s `scripts/defect-density.sh` takes `--source review|incident,prod|review,incident,prod` and defaults the **release gate specifically** to `incident,prod` (field defects) — the blended/review numbers are available for dashboards via an explicit `--source` flag but are never the release-gate threshold. See that kit's "Source segmentation" section.
+
 If field defect density isn't trending toward the target after a few release cycles, the fix isn't "try harder" — audit which of Sections 1–6 is actually being followed versus just documented.
+
+**Implemented, not just prescribed:** `DEFECT_DENSITY_KIT.md` §12's
+`scripts/density-trend-audit.sh` automates exactly this check — it compares
+the last N release-density snapshots and, if the trend isn't improving,
+prints this section's audit prompt (per §1–6) directly rather than leaving
+it as a sentence someone has to remember to act on.
 
 ## 8. Applying this to an existing codebase
 Sections 4, 5, and 6 (gates, review sizing, feedback loop) apply as-is starting today — they're process changes, not dependent on the code's history.
@@ -80,6 +90,8 @@ Sections 1 and 7 do not retrofit directly:
 ## 9. Applying and enforcing this file
 **A markdown file, on its own, is not enforced — it's context.** Expecting a standards document to behave like configuration is a common and documented failure mode. Getting real enforcement requires three distinct tiers; each closes a gap the previous one leaves open. Skipping straight to Tier 0 is the most common mistake and provides no actual guarantee.
 
+> **Vocabulary note:** the rest of the AI Governance Kit pack (`agent-governance-kit.md`, `push-gate-kit.md`, `pr-workflow-kit.md`, `infra-gate-kit.md`) calls these same three enforcement levels "**Layer 1 / 2 / 3**" instead of "Tier 0 / 1 / 2." They're the identical split — Tier 0 = advisory context, Tier 1 = session-level PreToolUse/PostToolUse hooks (Layer 1 in the other kits), Tier 2 = the git-hook-and-server-side backstop (Layer 2, and Layer 3 where a remote API is involved, e.g. branch protection). Read "Tier" and "Layer" as synonyms across this pack — the numbering starts at a different offset (0 vs 1) because this file counts the advisory-context step as its own tier and the other kits treat it as pre-enforcement scaffolding, not a tier at all.
+
 **Tier 0 — Advisory (context only, no guarantee):**
 Reference this file from the project's `CLAUDE.md` with `@QUALITY_STANDARD.md`. It auto-loads at session start and survives `/compact`. This shapes the agent's behavior but does not guarantee compliance — treat it as necessary, not sufficient.
 
@@ -88,22 +100,23 @@ Two hooks do different jobs and both are needed:
 - `PostToolUse` on `Edit|Write`: run lint/type-check/tests after every file change. On failure, exit code 2 sends the error back to Claude as a blocking message it must address. **This does not undo the edit** — the violation existed on disk momentarily — it's a fast self-correction loop, not a hard block.
 - `PreToolUse` on `Bash` matched against `git commit` / `git push`: run the full gate (lint + tests + coverage threshold) *before* the commit/push executes, and exit code 2 blocks the action outright. This is the actual hard block — nothing lands without passing.
 
-Illustrative sketch (verify current field names against Claude Code's hooks reference before using — hook schemas have changed over time):
+**This is not just an illustrative sketch — it ships.** `agent-governance-kit.md` provides both scripts verbatim: `scripts/lint-and-test.sh` (the `PostToolUse` fast self-correction loop described above) and `scripts/require-review.sh` + the git `pre-commit` hook (the `PreToolUse`/hard-block pair). Install `agent-governance-kit.md` to get this tier for real rather than hand-rolling it from the sketch below.
+
 ```json
 {
   "hooks": {
     "PostToolUse": [{
       "matcher": "Edit|Write",
-      "hooks": [{ "type": "command", "command": ".claude/hooks/lint-and-test.sh" }]
+      "hooks": [{ "type": "command", "command": "./scripts/lint-and-test.sh" }]
     }],
     "PreToolUse": [{
       "matcher": "Bash",
-      "hooks": [{ "type": "command", "command": ".claude/hooks/gate-commit.sh" }]
+      "hooks": [{ "type": "command", "command": "./scripts/require-review.sh" }]
     }]
   }
 }
 ```
-`gate-commit.sh` should inspect stdin for the actual command being run, only act when it matches `git commit`/`git push`, run the full check suite, and exit 2 with a clear reason on failure.
+`scripts/require-review.sh` inspects stdin for the actual command being run, only acts when it matches `git commit`, checks the review marker, and exits 2 with a clear reason on failure — see `agent-governance-kit.md` for the full, verbatim implementation (including the diff-size check from §5 below, wired into the same pre-commit hook).
 
 **Critical operational detail:** commit hook config to **project-level** `.claude/settings.json`, not personal `~/.claude/settings.json`. Project-level hooks apply to everyone working in the repo; personal ones apply only to whoever set them up locally. If the goal is team-wide enforcement, the hooks must live in the repo.
 

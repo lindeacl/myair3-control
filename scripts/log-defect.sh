@@ -3,6 +3,10 @@
 # code-reviewer agent (source=review) whenever it fixes a Critical/Warning
 # before writing .review-pass, and by the incident playbook (source=incident)
 # for anything caught after shipping.
+#
+# Usage:
+#   scripts/log-defect.sh --severity Critical --class "N+1 query" \
+#     --files "src/api/foo.js,src/api/bar.js" --source review [--commit <sha>]
 set -euo pipefail
 SEVERITY="" CLASS="" FILES="" SOURCE="" COMMIT=""
 while [ $# -gt 0 ]; do
@@ -16,9 +20,21 @@ while [ $# -gt 0 ]; do
   esac
 done
 : "${SEVERITY:?--severity required (Critical|Warning|Suggestion)}"
-: "${CLASS:?--class required — name the CLASS the bug belongs to (DEFECT_DISCIPLINE Rule 1), not just this instance}"
+# NOTE: no apostrophe in this message. An unescaped `'` inside a
+# `${VAR:?message}` expansion breaks bash's quote-matching even though the
+# whole thing sits inside outer double quotes — caught the hard way (via
+# `bash -n` failing with "unexpected EOF while looking for matching `'`",
+# pointing at an unrelated later line) when a project applying this kit
+# wrote "the bug's CLASS" here.
+: "${CLASS:?--class required — name the bug CLASS per DEFECT_DISCIPLINE Rule 1, not just this instance}"
 : "${SOURCE:?--source required (review|incident|prod)}"
 if [ -z "$COMMIT" ]; then
+  # NOT `$(git rev-parse HEAD 2>/dev/null || echo "unknown")` — when HEAD is
+  # unresolvable (no commits yet), some git versions still print "HEAD" to
+  # stdout before failing, and that partial output gets captured ALONGSIDE
+  # the `|| echo` fallback inside the same $(...), producing "HEAD\nunknown"
+  # instead of just "unknown" (caught in testing). Structuring the fallback
+  # as a separate assignment instead of inside the substitution avoids it.
   COMMIT=$(git rev-parse HEAD 2>/dev/null) || COMMIT="unknown"
 fi
 

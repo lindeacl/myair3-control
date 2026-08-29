@@ -1,6 +1,8 @@
 #!/bin/bash
 # PreToolUse gate: block a release/tag command unless defect-density.sh has
-# been run with --enforce and passed for the CURRENT defect log state.
+# been run with --enforce (FIELD density — the default --source incident,prod,
+# per QUALITY_STANDARD.md §7) and passed for the CURRENT defect log state.
+# EDIT RELEASE_PATTERN below for this project's actual release command.
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
@@ -16,6 +18,7 @@ if [ ! -f "$MARKER" ]; then
   echo "Blocked: no passing defect-density check on record for the current defect log state." >&2
   echo "  Run: scripts/defect-density.sh --enforce" >&2
   echo "  Then: shasum -a 256 $LOG | cut -d' ' -f1 | xargs -I{} touch .claude/.density-pass-{}" >&2
+  echo "  A new defect logged after this changes the hash and requires a fresh pass." >&2
   exit 2
 fi
 exit 0

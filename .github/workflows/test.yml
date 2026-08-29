@@ -3,17 +3,45 @@ name: Test
 on:
   push:
     branches: ['**']
+    tags: ['v*']
   pull_request:
+  schedule:
+    - cron: '0 6 * * 1'   # weekly Monday 06:00 UTC — mutation-testing cadence, see the mutation-testing job below
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history — needed for the diff-size check and defect-density --since
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm ci
+      - name: Diff size (QUALITY_STANDARD.md §5 — hard-enforced here)
+        # Local pre-commit (scripts/check-diff-size.sh) only WARNS above 400
+        # lines; this is the actual hard block at the 1,000-line cliff where
+        # review-detection data stops being ambiguous (~28%, SmartBear/Cisco
+        # study) — the local hook can be skipped with --no-verify, this can't.
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1
+          CHANGED=$(git diff --numstat origin/${{ github.base_ref }}...HEAD | awk '{a+=$1;d+=$2} END{print a+d+0}')
+          echo "Changed lines: $CHANGED"
+          if [ "$CHANGED" -gt 1000 ]; then
+            echo "::error::Diff is $CHANGED lines — over the 1,000-line cliff (QUALITY_STANDARD.md §5, ~28% detection rate). Split this PR."
+            exit 1
+          fi
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
+        # Server-side backstop for the same check the local pre-commit hook
+        # runs (.husky/pre-commit) — that one soft-fails when gitleaks isn't
+        # on the developer's PATH, and neither one runs at all for a merge
+        # via the GitHub web UI. This is the layer that can't be skipped.
+        # Uses this repo's existing .gitleaks.toml (fingerprint allowlist).
       - run: npm audit --audit-level=high
       - run: node scripts/check-html-js.mjs index.html
       # QUALITY_STANDARD.md §9: a gate isn't adopted until a deliberate
@@ -30,14 +58,43 @@ jobs:
             echo "::error::A test.skip()/test.fixme() was added — a skipped test is a failing test. Remove it, or make this CI step assert explicitly around the skip condition." >&2
             exit 1
           fi
-      - name: Defect density report
-        run: scripts/defect-density.sh
-      - name: Defect density gate (release only)
+      - name: Defect density report (blended, informational)
+        # Every source blended — a dashboard signal, never a gate. Never
+        # used as the release threshold (see the enforcing step below).
+        run: scripts/defect-density.sh --source review,incident,prod
+      - name: Defect density gate (field defects)
+        # FIELD density only (script default: --source incident,prod), per
+        # QUALITY_STANDARD.md §7 — review catches are a leading indicator,
+        # not the release-gate number. --record appends this release's
+        # density to .claude/density-history.jsonl for the trend audit
+        # (scripts/density-trend-audit.sh).
         if: startsWith(github.ref, 'refs/tags/')
-        run: scripts/defect-density.sh --enforce
+        run: scripts/defect-density.sh --enforce --record
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  mutation-testing:
+    name: mutation testing (weekly + release tags — MUTATION_TESTING.md)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Mutation testing
+        run: npm run test:mutation
+        # See CLAUDE.md's "Mutation testing" section: stryker.conf.json's
+        # mutate glob points directly at index.html (verified: Stryker's
+        # instrumenter does find and generate real mutants inside the
+        # inline <script> block — an earlier claim that it couldn't was
+        # never actually tested and was wrong). thresholds.break is
+        # deliberately null (not yet a real gate) until a full run
+        # completes and reports a real baseline score — that's a long job
+        # (re-runs the full Playwright suite per mutant). This step runs
+        # and reports but won't fail the build until that baseline exists.
