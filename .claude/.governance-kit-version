@@ -1,0 +1,4 @@
+agent-governance-kit: 2.0.0
+push-gate-kit: 2.0.0
+pr-workflow-kit: 2.0.0
+infra-gate-kit: 2.0.0

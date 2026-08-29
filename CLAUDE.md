@@ -1,4 +1,6 @@
 
+@docs/QUALITY_STANDARD.md
+
 ## Agent Topology — models
 
 - **Code reviewer: a SEPARATE Opus agent** — `.claude/agents/code-reviewer.md`
@@ -107,14 +109,36 @@ incident, gets logged: `scripts/log-defect.sh --severity ... --class ...
 docs/DEFECT_DISCIPLINE.md Rule 1), not just the instance.
 
 Defect density (`scripts/defect-density.sh`) is reported on every CI run for
-visibility — it never blocks a push or PR, only a release (a `git tag v*`,
-`gh release create`, or `npm version` command — none of which this project
-currently uses, so the release gate is dormant until one does). The
-threshold in `.claude/defect-density.config.json` was bootstrapped from this
-project's actual history (the two real defects found and fixed earlier in
-this project's life — see `.claude/defects.jsonl`), not a guess. It's a
-ratchet — lower it as the codebase matures, never raise it without a comment
-explaining why.
+visibility (blended across all sources — a dashboard signal only) — it
+never blocks a push or PR, only a release (a `git tag v*`, `gh release
+create`, or `npm version` command — none of which this project currently
+uses, so the release gate is dormant until one does). Releases are gated on
+**field defects only** (`--source incident,prod`, the script's default —
+review catches are a leading indicator, not the release-gate number, per
+QUALITY_STANDARD.md §7): `scripts/require-release-density.sh` blocks
+tagging/publishing a release unless `defect-density.sh --enforce` has
+passed for the current defect log. The threshold in
+`.claude/defect-density.config.json` was bootstrapped from this project's
+actual field-defect history (`--source incident,prod` — the two real
+incidents found and fixed earlier in this project's life, see
+`.claude/defects.jsonl`), not a guess, and not diluted by the much larger
+number of Warnings the code-reviewer has caught in review (also logged,
+`--source review`, but deliberately excluded from the release threshold).
+It's a ratchet — lower it as the codebase matures, never raise it without a
+comment explaining why.
+
+Releases are ALSO gated on trend: `scripts/require-trend-audit.sh` blocks a
+release if density isn't trending toward target over the last 3 releases
+(`scripts/density-trend-audit.sh`), unless a written override — an actual
+reason, not just "ok" — is on record at
+`.claude/.trend-audit-override-<hash-of-density-history.jsonl>`. If you hit
+this block: run `scripts/density-trend-audit.sh` yourself, read the output,
+and ask the user whether to proceed and why — don't write a placeholder
+override just to get past the gate. This gate is also currently dormant —
+`.claude/density-history.jsonl` only accumulates entries once a real
+release ships with `defect-density.sh --enforce --record` (wired into
+`.github/workflows/test.yml`'s release-tag job), and needs 3 recorded
+releases before there's anything to compare.
 
 ## Dependency scanning
 
@@ -123,18 +147,121 @@ explaining why.
 but don't block — see this repo's CI run for anything currently accepted and
 why (documented at the point the finding first appeared, not silently ignored).
 
+## CI governance stages (CI_TEMPLATES.md)
+
+`.github/workflows/test.yml` also runs, server-side (can't be skipped with
+`--no-verify` the way the equivalent local pre-commit checks can):
+a **diff-size check** (PR-only, hard-blocks over 1,000 changed lines per
+QUALITY_STANDARD.md §5 — the local `scripts/check-diff-size.sh` only warns
+above 400), and a **gitleaks secret scan** (backstops `.husky/pre-commit`'s
+same check, which soft-fails when gitleaks isn't on the developer's PATH
+and doesn't run at all for a merge via the GitHub web UI). A separate
+`mutation-testing` job runs weekly (Monday 06:00 UTC) and on release tags
+— see "Mutation testing" below for why it doesn't fail the build yet.
+
+## Reviewer canary policy
+
+Monthly, or before a major release, run each canary in
+`canary-manifest.json`: `scripts/setup-canary.sh <id>`, delegate to the
+`code-reviewer` subagent against the scaffolded scratch file, confirm it
+catches the planted defect at the expected severity, then
+`scripts/log-canary-result.sh --id <id> --result pass|fail`. Check the
+trend with `scripts/canary-trend-audit.sh`.
+
+This is informational, not a gate — a single miss doesn't block anything.
+A declining pass-rate trend is a signal to look at the reviewer checklist
+or model, not something to route around by re-running until it passes.
+The five starting canaries are the upstream kit's generic JS examples
+(SQL injection, cross-tenant leak, N+1 query, race condition, missing
+input validation) — this project has no database/ORM, so two of them
+(sqli-001, authz-001) test the reviewer's general pattern recognition on
+a synthetic snippet rather than a defect class this app could actually
+ship. Worth extending later with canaries drawn from this project's own
+`.claude/defects.jsonl` history (the NaN-into-CSS-custom-property class,
+the grace-window race class) — real, already-discovered defect classes
+make better canaries than generic ones, per REVIEWER_CANARY.md §1's own
+note. Not done yet; noted as a follow-up, not required for the
+scaffolding to be in place.
+
+## PR audit sampling policy
+
+Every 10th gated PR merge is automatically queued for a blind, asynchronous
+re-review — `scripts/track-merge-for-audit.sh` handles the queueing, no
+action needed at merge time. Periodically (weekly is reasonable):
+`scripts/setup-pr-audit.sh`, delegate to `code-reviewer` with the exact
+framing the setup script prints (explicitly instructing it not to recall
+having reviewed this PR before — see PR_AUDIT_SAMPLING.md's independence
+note), then `scripts/log-pr-audit-result.sh --pr <n> --result
+confirmed|found_new_issue`.
+
+This is informational, not a gate — nothing blocks on it. A rising rate of
+`found_new_issue` on real, sampled PRs is the most direct review-quality
+signal this pack has; treat it as a prompt to investigate (review-size
+drift, deadline pressure, checklist gaps), not something to route around.
+
+## Mutation testing
+
+`stryker.conf.json` mutates `index.html` directly. An earlier version of
+this section claimed Stryker "cannot mutate the inline `<script>` this
+app's logic lives in" and pointed `mutate` at the near-empty `sw.js`
+instead — that claim was never actually tested and was wrong: verified
+directly (a scoped probe run against `index.html:730-830`, ~100 lines)
+that Stryker's instrumenter finds and generates real mutants inside the
+inline `<script>` block (78 mutants in that slice alone; the sibling
+`ios-app` repo independently confirmed the same thing against its own
+inline-script `index.html`, at full scale — 1043 mutants). Per
+`DEFECT_DISCIPLINE.md` Rule 5 ("separate observed from believed"), the
+prior text was a *believed* claim presented as fact; this is the
+corrected, *observed* one.
+
+`thresholds.break` is left at `null` (gate not yet enforcing) until a
+full run completes and reports a real baseline score — that's a genuinely
+long job (re-runs the full Playwright suite once per mutant; expect
+well over an hour given the mutant count implied by the 78-in-100-lines
+sample scaled to the ~900-line script). Run it when convenient:
+`npm run test:mutation`, then set `thresholds.break` a few points below
+whatever score it reports (same "measured reality, not a target"
+bootstrap rule as every other ratchet in this pack) and update this
+section with the real number.
+
+## Property testing
+
+`e2e/property/invariants.spec.js` — three property tests (fast-check +
+Playwright, since this project has no Vitest/Jest) against real invariants
+found via `PROPERTY_TESTING.md` §2's discovery method (grepped this
+codebase's actual temp/damper/state-setting logic, not the template's
+money-transfer examples): `tempToColor()`'s dial-ring color mapping always
+clamps to a valid `rgb()` in range for any finite input; the zone
+desired-temp +/- stepper can never push the value outside `[16, 30]`
+regardless of tap sequence; the damper-percent input and its display
+readout stay within `[0, 100]` for any assigned value including
+deliberately out-of-range ones. All three drive the REAL running app via
+`page.evaluate`/DOM clicks against `index.html`, not a reimplementation of
+its logic (`DEFECT_DISCIPLINE.md` Rule 2). Runs in the same suite:
+`npx playwright test`. `tempToColor()`'s test deliberately excludes NaN
+input (`noNaN: true`) — the function itself has no internal NaN guard
+(every current call site guards before calling it instead, see the
+comment at the test), which is a real, documented gap, not something this
+test suite is meant to silently paper over.
+
 ## Reference docs
 
 `docs/` holds full copies of the playbooks this project's CLAUDE.md summarizes:
 `DEFECT_DISCIPLINE.md`, `TESTING_HANDOFF.md`, `INCIDENT_RESPONSE.md`,
 `DEFECT_DENSITY_KIT.md`, `infra-gate-kit.md`, `agent-governance-kit.md`,
 `pr-workflow-kit.md`, `push-gate-kit.md`, `QUALITY_STANDARD.md`, `README.md`
-(the kit's own index). `docs/postmortems/` is where an incident postmortem
-goes if one is ever needed (see `INCIDENT_RESPONSE.md`).
+(the kit's own index), plus `SECRETS_MANAGEMENT.md`,
+`OBSERVABILITY_STANDARD.md`, `DATA_CLASSIFICATION.md`, `ADR_TEMPLATE.md`
+(with `docs/adr/` for actual ADRs), `CODE_STANDARDS.md` (Section 0 filled
+in for this project's real stack), `STANDARDS_AUDIT.md`, and
+`TEST_EFFECTIVENESS_AUDIT.md` — all reference-only in the same sense as
+`QUALITY_STANDARD.md` below, not enforced gates. `docs/postmortems/` is
+where an incident postmortem goes if one is ever needed (see
+`INCIDENT_RESPONSE.md`).
 
-`QUALITY_STANDARD.md` is reference-only here, not adopted verbatim — see
-"Quality standard adoption notes" below for what applies to this project and
-what doesn't.
+`QUALITY_STANDARD.md` is `@`-imported at the top of this file (auto-loads
+every session) but is not adopted verbatim — see "Quality standard adoption
+notes" below for what applies to this project and what doesn't.
 
 ## Quality standard adoption notes
 
@@ -208,13 +335,16 @@ was actually adopted vs. what can't be, section by section:
   Both the coverage floor and the defect-density threshold were bootstrapped
   from measured reality, not asserted targets, exactly as this section
   prescribes.
-- **§9 Tiers — Tier 0 (advisory) deliberately NOT done via `@`-import.**
-  This project's existing convention is prose-summarizing each kit in
-  `CLAUDE.md` with a full copy in `docs/` for reference, not auto-loading
-  every playbook's full text into every session's context via `@file`
-  imports — adding five more `@`-imported files would meaningfully bloat
-  every session's starting context for marginal benefit over the existing
-  summaries. Tier 1 is now implemented for the fast check (see §4 above);
+- **§9 Tiers — Tier 0 (advisory) now done via `@`-import.** An earlier
+  version of this section said the `@`-import was deliberately skipped
+  because auto-loading every playbook's full text would bloat every
+  session's starting context for marginal benefit over the prose summaries
+  already in this file — that reasoning was sound as a *default*, but the
+  user explicitly asked for `QUALITY_STANDARD.md` specifically (not the
+  other playbooks) to be `@`-imported, so it now is (top of this file). The
+  other kit docs in `docs/` stay reference-only, not auto-imported — this
+  was a deliberate single-file exception, not a reversal of the general
+  policy. Tier 1 is now implemented for the fast check (see §4 above);
   the full-suite half is deliberately still commit-gated only, for the
   latency reason given above. Tier 2 (CI + branch protection) was already in
   place before this update. §9's closing rule — "deliberately introduce a

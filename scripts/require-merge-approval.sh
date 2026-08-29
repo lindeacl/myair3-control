@@ -1,12 +1,14 @@
 #!/bin/bash
 # PreToolUse gate: block a PR-merge command unless BOTH markers are present
-# and fresh for the PR being merged — a clean independent review AND a
-# separate human merge confirmation. Exit 2 blocks.
+# and fresh for the PR being merged. Exit 2 blocks.
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
 MATCHED=""
 if echo "$COMMAND" | grep -qE '\bgh\b' && echo "$COMMAND" | grep -qE '\bpr\s+merge\b'; then
+  MATCHED=1
+elif echo "$COMMAND" | grep -qE 'pullrequests/[0-9]+\?api-version' \
+  && echo "$COMMAND" | grep -qE '(-X|--request)\s*PATCH'; then
   MATCHED=1
 fi
 [ -z "$MATCHED" ] && exit 0

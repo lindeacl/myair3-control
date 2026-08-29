@@ -1,0 +1,13 @@
+# Commands that skip interactive plan/diff display — these need a plan-review
+# marker IN ADDITION TO the apply-confirmation marker in infra-gate.patterns.
+# Bare `terraform apply` / `cdk deploy` (no auto-approve flag) are NOT here —
+# the tool itself forces a human to see the plan via its own prompt.
+#
+# Deliberately EMPTY, same reasoning as the sibling infra-gate.patterns:
+# this project has zero cloud infrastructure, zero Terraform, zero cloud CLI
+# usage — the upstream kit's Terraform/CDK/CloudFormation/SAM defaults would
+# be unreviewed dead weight here (and are currently unreachable regardless,
+# since require-infra-approval.sh only consults this file after a command
+# already matched something in infra-gate.patterns, which is also empty).
+# If this project ever grows real infra tooling, add matching patterns to
+# BOTH files together — see CLAUDE.md's "Infra change policy" section.

@@ -17,6 +17,11 @@ to infra tooling instead of `git push`.
 > (a dropped instance, a disabled billing account, a deleted bucket). If your
 > agent has cloud CLI access, install this kit.
 
+**Retrofit-safe on an existing project:** the installer never overwrites an
+existing `.claude/infra-gate.patterns` (checks for it first, skips if
+present) — it only creates the defaults on a first install. Re-run it
+safely any time; your own edits to the pattern list are never clobbered.
+
 ---
 
 ## Per-project setup checklist
@@ -24,10 +29,14 @@ to infra tooling instead of `git push`.
 1. Copy `scripts/require-infra-approval.sh` (step 1) — `chmod +x`.
 2. Copy `.claude/infra-gate.patterns` (step 2) — the default pattern list.
    **Edit it for this project's actual tooling** — the defaults cover common
-   Terraform/GCP/AWS/Azure/K8s/DB-migration/Docker shapes, but every project's
-   real danger list differs (a project with no Kubernetes doesn't need the
-   `kubectl` pattern; a project on Cloudflare needs a `wrangler` pattern
-   instead).
+   Terraform/CDK/CloudFormation/SAM/GCP/AWS/Azure/K8s/DB-migration/Docker
+   shapes, but every project's real danger list differs (a project with no
+   Kubernetes doesn't need the `kubectl` pattern; a project on Cloudflare
+   needs a `wrangler` pattern instead).
+2b. Copy `.claude/infra-gate.plan-required.patterns` (step 2b) — commands
+   that skip interactive plan/diff display (auto-approve applies) and
+   therefore need a plan-review marker in addition to the apply-confirmation
+   marker. See §1's script comments for the exact mechanism.
 3. Merge the additional `PreToolUse` hook entry (step 3) into the project's
    `.claude/settings.json`, into the **same** `"Bash"` matcher's `hooks` array
    as the other gates if already installed — do not create a second matcher
@@ -60,6 +69,16 @@ Requires `jq` and `shasum` on `PATH`.
 # commit. The marker is instead keyed to a SHA-256 of the EXACT matched
 # command string, so approving one destructive command never silently
 # approves a different one, even if both match the same pattern.
+#
+# PLAN-REVIEW GATE (mirrors the code path's "review the diff before merge"
+# requirement, previously missing here): commands matching
+# .claude/infra-gate.plan-required.patterns — auto-approve/non-interactive
+# applies where nothing else forces a human to see the plan first — need a
+# SECOND marker proving a plan/diff was captured and shown before the apply
+# marker is honored. Interactive applies (bare `terraform apply`, `cdk
+# deploy` without --require-approval never) already force a human to see the
+# plan via the tool's own prompt, so they're exempt from this second check —
+# only the auto-approve shapes bypass that built-in visibility.
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 [ -z "$COMMAND" ] && exit 0
@@ -84,6 +103,32 @@ done < "$PATTERNS_FILE"
 CMD_HASH=$(printf '%s' "$COMMAND" | shasum -a 256 | cut -d' ' -f1)
 MARKER=".claude/.infra-approved-$CMD_HASH"
 
+# Plan-review sub-gate — only for commands that skip interactive plan display.
+PLAN_PATTERNS_FILE=".claude/infra-gate.plan-required.patterns"
+if [ -f "$PLAN_PATTERNS_FILE" ]; then
+  PLAN_MATCHED=""
+  while IFS= read -r pattern; do
+    [ -z "$pattern" ] && continue
+    case "$pattern" in \#*) continue ;; esac
+    if echo "$COMMAND" | grep -qE "$pattern"; then
+      PLAN_MATCHED=1
+      break
+    fi
+  done < "$PLAN_PATTERNS_FILE"
+  if [ -n "$PLAN_MATCHED" ]; then
+    PLAN_MARKER=".claude/.infra-plan-reviewed-$CMD_HASH"
+    if [ ! -f "$PLAN_MARKER" ]; then
+      echo "Blocked: this command bypasses interactive plan display (auto-approve/non-interactive) and needs a PLAN REVIEW recorded first, not just an apply confirmation." >&2
+      echo "  Command: $COMMAND" >&2
+      echo "  Run the read-only plan/diff equivalent (terraform plan / cdk diff /" >&2
+      echo "  aws cloudformation create-change-set), show it to the user, then:" >&2
+      echo "    echo ok > $PLAN_MARKER" >&2
+      echo "  Only after that will the apply-confirmation step below be evaluated." >&2
+      exit 2
+    fi
+  fi
+fi
+
 if [ ! -f "$MARKER" ]; then
   echo "Blocked: this command matches a configured destructive-infra pattern in $PATTERNS_FILE." >&2
   echo "  Command: $COMMAND" >&2
@@ -93,6 +138,20 @@ if [ ! -f "$MARKER" ]; then
   exit 2
 fi
 exit 0
+```
+
+### `.claude/infra-gate.plan-required.patterns`  (starting defaults)
+
+```
+# Commands that skip interactive plan/diff display — these need the
+# plan-review marker above IN ADDITION TO the apply-confirmation marker.
+# Bare `terraform apply` / `cdk deploy` (no auto-approve flag) are NOT here —
+# the tool itself forces a human to see the plan via its own prompt.
+
+\bterraform\s+apply\b.*-auto-approve\b
+\bcdk\s+deploy\b.*--require-approval\s+never\b
+\baws\s+cloudformation\s+deploy\b
+\bsam\s+deploy\b.*--no-confirm-changeset\b
 ```
 
 ---
@@ -117,10 +176,25 @@ list below is a reasonable starting point, not exhaustive).
 \bgcloud\s+billing\s+accounts\s+.*disable\b
 \bgcloud\s+sql\s+instances\s+delete\b
 
-# AWS
+# AWS — generic CLI deletes
 \baws\s+.*\bdelete-
 \baws\s+s3\s+rm\s+.*--recursive\b
 \baws\s+rds\s+delete-db-instance\b
+
+# AWS — CDK (previously missing: a Terraform-only pattern list misses every
+# CDK/CloudFormation/SAM-native team entirely)
+\bcdk\s+deploy\b
+\bcdk\s+destroy\b
+\bcdk\s+deploy\b.*--require-approval\s+never\b
+
+# AWS — CloudFormation direct
+\baws\s+cloudformation\s+delete-stack\b
+\baws\s+cloudformation\s+update-stack\b
+\baws\s+cloudformation\s+deploy\b.*--stack-name\s+.*(prod|production)\b
+
+# AWS — SAM
+\bsam\s+deploy\b
+\bsam\s+delete\b
 
 # Azure
 \baz\s+.*\bdelete\b
@@ -212,13 +286,34 @@ project's stack and configure it once, outside the agent's control:
 - **GCP:** an Organization Policy restricting who can hold
   `roles/billing.admin` / delete permissions; a second-approver requirement
   on sensitive projects.
-- **AWS:** IAM permission boundaries / SCPs restricting delete-class actions
-  to a break-glass role, not the agent's default credentials.
+- **AWS — the real boundary is account isolation, not just IAM scoping
+  within one account.** IAM permission boundaries / SCPs restricting
+  delete-class actions to a break-glass role (below) are defense in depth,
+  but the actual AWS Well-Architected-recommended control is: **production
+  lives in its own AWS account** under AWS Organizations, reached only via
+  cross-account role assumption (`sts:AssumeRole` into a prod-scoped role,
+  ideally requiring MFA or a break-glass approval flow). An agent's default
+  credentials in the dev/CI account then **cannot reach production at all**
+  — there's no `aws sts assume-role --role-arn arn:...:role/prod-*` call to
+  pattern-match against, because the credentials it holds have no path to
+  that account's resources, full stop. Pattern-matching
+  `aws ... delete-*`/`aws cloudformation delete-stack` (below) still matters
+  for the dev/staging account it *can* reach, but treat account isolation as
+  the primary control and the pattern list as the secondary one — not the
+  other way around.
+  - Within the prod account itself: IAM permission boundaries / SCPs
+    restricting delete-class and billing-class actions to a named
+    break-glass role, so even someone who *has* assumed the prod role can't
+    silently run a destructive action without it standing out.
 - **Kubernetes:** RBAC scoping the agent's kubeconfig context to non-prod
   clusters entirely, so a matching command has nothing to reach.
 - **CI/CD:** a manual-approval stage in the deploy pipeline (GitHub
   Environments with required reviewers, Azure Pipelines approval checks,
-  CodePipeline manual approval action) in front of any prod deploy step.
+  CodePipeline manual approval action) in front of any prod deploy step. See
+  `CI_TEMPLATES.md` §3 for the equivalent problem on the *credential* side —
+  CI itself should reach AWS via short-lived OIDC role assumption, never
+  long-lived static keys, for the same "structurally incapable of reaching
+  what it shouldn't" reason as account isolation above.
 
 Without a provider-side boundary, this kit is honor-system enforcement on the
 agent's own tool calls — say so plainly to whoever installs it.
@@ -250,6 +345,20 @@ echo '{"tool_input":{"command":"terraform destroy -target=module.other -auto-app
 # expect: exit 2 — a DIFFERENT command, even if similarly destructive, needs its own marker
 
 rm -f ".claude/.infra-approved-$HASH"   # clean up
+
+# 4. Plan-review sub-gate: an auto-approve command needs BOTH markers, and
+#    the plan-review marker specifically, before the apply marker is honored
+CMD='terraform apply -auto-approve'
+HASH=$(printf '%s' "$CMD" | shasum -a 256 | cut -d' ' -f1)
+echo ok > ".claude/.infra-approved-$HASH"
+echo "{\"tool_input\":{\"command\":\"$CMD\"}}" | ./scripts/require-infra-approval.sh
+# expect: exit 2 — "needs a PLAN REVIEW recorded first" (apply marker alone isn't enough)
+
+echo ok > ".claude/.infra-plan-reviewed-$HASH"
+echo "{\"tool_input\":{\"command\":\"$CMD\"}}" | ./scripts/require-infra-approval.sh
+# expect: exit 0 — both markers now present
+
+rm -f ".claude/.infra-approved-$HASH" ".claude/.infra-plan-reviewed-$HASH"   # clean up
 ```
 
 ---

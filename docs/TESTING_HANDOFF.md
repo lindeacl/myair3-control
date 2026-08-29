@@ -1,10 +1,17 @@
 # Testing Handoff — a portable playbook
 
 A reusable testing setup + discipline distilled from a production JS/TS service
-(Fastify API + vanilla-JS frontends + PWA). Framework-agnostic where it can be;
-opinionated where experience earned it. Copy this into a new project's
-`docs/` (or root) and adapt the specifics — the **layer model** and the
-**quality discipline** transfer unchanged; the exact tools are swappable.
+(Fastify API + vanilla-JS frontends + PWA) — one example stack, not a
+requirement; the tools named throughout are swap-ins, see §1's table.
+Framework-agnostic where it can be; opinionated where experience earned it.
+Copy this into a new project's `docs/` (or root) and adapt the specifics —
+the **layer model** and the **quality discipline** transfer unchanged; the
+exact tools are swappable.
+
+**Works the same on an existing codebase.** §4's coverage thresholds are a
+ratchet bootstrapped at *measured reality minus a hair* — for a project with
+years of history and 40% coverage today, that's the starting floor, not a
+80% bar it's retroactively failing. Nothing in this doc assumes greenfield.
 
 > One-line summary: **Two runners (Vitest for unit/integration, Playwright for
 > E2E), coverage as a ratchet not a target, and a CI gate that proves the tests
@@ -121,6 +128,13 @@ export default defineConfig({ test: {
 
 ## 5. CI gate design
 
+**Local pre-commit enforcement:** unit/integration tests are auto-detected
+and hard-blocked on failure by `agent-governance-kit.md`'s `.husky/pre-commit`
+(package.json/pytest/go/cargo, or override via `.claude/test-command`) —
+this is real, wired enforcement, not just a recommendation. E2E is
+deliberately excluded from that local hook (too slow to gate every commit
+on) and lives here, at the CI layer, instead — see `CI_TEMPLATES.md`.
+
 The gate must fail closed and prove the tests were real. Non-negotiables:
 
 - **Run every layer on every push and PR**: unit, integration, E2E, lint, SAST,
@@ -197,11 +211,12 @@ the stakes justify it — for anything touching money, #1–#3 are worth it earl
    is stubbed in every test, stub drift is invisible — the vendor changes a field
    and every test stays green while prod breaks. Pin the stub to a captured real
    response, or use Pact/schema validation.
-2. **Mutation testing (Stryker).** Directly measures assertion strength — the
-   thing coverage % *doesn't*. Highest-leverage quality add if your history
-   includes "green but worthless" tests.
+2. **Mutation testing (Stryker).** ~~Highest-leverage quality add~~ **Implemented
+   — see `MUTATION_TESTING.md`.** Directly measures assertion strength, the
+   thing coverage % *doesn't*.
 3. **Property/fuzz tests on numeric/financial invariants** (rounding, balances
-   never negative, `amount == settled`). Enumerated money tests miss the edge.
+   never negative, `amount == settled`). **Implemented — see
+   `PROPERTY_TESTING.md`.** Enumerated money tests miss the edge; this doesn't.
 4. **Visual regression** (Playwright `toHaveScreenshot()`). Hand-written
    geometric/CSS assertions are brittle and pass with the bug live; pixel
    baselines catch UI regressions automatically.

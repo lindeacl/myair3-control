@@ -19,3 +19,21 @@ coverage-raw/
 
 # Defect Density Kit — release-gate pass markers
 .claude/.density-pass-*
+
+# Defect Density Kit — trend-audit override markers (density-history.jsonl
+# and defects.jsonl themselves ARE committed — see DEFECT_DENSITY_KIT.md
+# §10/§10b, they're the audit trail, not ephemeral state)
+.claude/.trend-audit-override-*
+
+# PR Audit Sampling — local counter state only (pr-audit-queue.jsonl and
+# pr-audit-results.jsonl ARE committed — they're the audit trail)
+.claude/.merge-audit-counter
+.claude/.pr-audit-scratch-*.diff
+
+# Reviewer Canary — scratch scaffolds only (canary-results.jsonl IS
+# committed — it's the audit trail)
+.claude/.canary-scratch-*
+
+# Mutation Testing — Stryker's sandbox + HTML/JSON report output
+.stryker-tmp/
+reports/

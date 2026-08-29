@@ -34,6 +34,15 @@ else
   echo "⚠️  gitleaks not installed — secret-scan gate SKIPPED (install: brew install gitleaks)." >&2
 fi
 
+# ── Diff-size gate (Agent Governance Kit — QUALITY_STANDARD.md §5) ───────────
+# Warns locally above 400 changed lines; CI (test.yml) hard-blocks PRs above
+# 1,000. CLAUDE.md and QUALITY_STANDARD.md both describe this as "wired into
+# the pre-commit hook" — it was copied into scripts/ but never actually
+# called here, so the local warning never fired. Matches
+# agent-governance-kit.md's own canonical placement (after secret-scan,
+# before the mechanical/test gates).
+./scripts/check-diff-size.sh
+
 # ── Mechanical gate (Agent Governance Kit — adapted for this project) ────────
 # No tsc/eslint/vitest here (no bundler, no TS) -- this is the equivalent
 # check for what's actually in this repo: does the embedded JS parse, and
