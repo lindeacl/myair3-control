@@ -49,6 +49,11 @@ fi
 # are there no duplicate static ids.
 node scripts/check-html-js.mjs index.html
 
+# ── Formatter gate (docs/CODE_STANDARDS.md §9.2) ──────────────────────────────
+# Scoped to **/*.{js,mjs} (see package.json + .prettierignore) -- index.html
+# is deliberately NOT included yet; see .prettierignore for why.
+npx prettier --check "**/*.{js,mjs}"
+
 # ── E2E tests (TESTING_HANDOFF.md) ────────────────────────────────────────────
 # Fast enough (~7s) to run on every commit locally, not just in CI.
 npx playwright test
