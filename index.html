@@ -39,7 +39,17 @@
     --lip-strong: inset 0 1px 0 rgba(255, 255, 255, 0.2);
     --text: #ffffff;
     --muted: rgba(255, 255, 255, 0.5);
-    --faint: rgba(255, 255, 255, 0.34);
+    /* Raised from 0.34 (~2.98:1 against the app's near-black background) to
+       0.58 -- 0.34 measured below the WCAG AA 4.5:1 floor for the ~11.5px
+       text this is used on (.note/.caption/.dial-caption/.foot-status,
+       off-state zone-tile temps). Verified via relative-luminance math
+       (WCAG's own formula) against both the flattest background stop
+       (#06070a, contrast ~6.88:1 at 0.58) and the lightest realistic one --
+       the html-level radial-gradient's brightest stop (#1b2b3f, near the
+       very top of the viewport), where it's still ~5.84:1 -- comfortably
+       clearing 4.5:1 either way. --muted is untouched: at 0.5 alpha it
+       already clears the floor (~5.3:1 against #06070a). */
+    --faint: rgba(255, 255, 255, 0.58);
     --accent: #7be0ff;
     --accent-deep: #3f6ff0;
     --accent-lift: #6fa8ff;
@@ -147,6 +157,23 @@
     border: none; box-shadow: 0 2px 6px rgba(0,0,0,0.5); cursor: pointer;
   }
   input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  /* Keyboard-focus ring for every other interactive control in the app --
+     previously only inputs/selects (above) had an explicit focus style, so
+     tabbing to a button/link control (Power, Mode, zone tiles' On/Off,
+     the dial +/- edges, the fan mini-steppers) left no visible indicator at
+     all beyond each browser's own inconsistent default. :focus-visible
+     (rather than :focus) keeps this to keyboard/programmatic focus only, so
+     it doesn't add an outline on every mouse/touch tap the way :focus would
+     -- matching the same --accent treatment already used for inputs/selects. */
+  button.icon-btn:focus-visible, a.icon-btn:focus-visible,
+  button.nav-btn:focus-visible,
+  .mode-circle:focus-visible,
+  a.cmd:focus-visible,
+  .dial-edge:focus-visible,
+  .mini-step:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 
   /* Visually-hidden but still test/automation-actionable: opacity keeps a
      real hit-testable layout box (unlike display:none), so .fill() and a
@@ -515,6 +542,41 @@
   .app-loading .dial-temp, .app-loading .zone-tile-temp { animation: shimmer-pulse 1.4s ease-in-out infinite; }
   @keyframes shimmer-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
+  /* ---- Small utility classes: layout tweaks that were previously
+     static (non-computed) inline style="..." attributes at 1-2 call sites
+     each -- pulled out here so nothing in the markup sets styling directly.
+     Dynamic per-element values (e.g. the --zone-temp-color/--zone-temp-tint
+     custom properties refreshState() sets via .style.setProperty(), or the
+     display:none the view-switching JS toggles directly) are NOT part of
+     this -- those have to stay inline since JS computes/reads them. ---- */
+  .mt-neg2 { margin-top: -2px; }
+  .mb-16 { margin-bottom: 16px; }
+  .mt-12 { margin-top: 12px; }
+  .mt-14 { margin-top: 14px; }
+  .mb-14 { margin-bottom: 14px; }
+  .m-0 { margin: 0; }
+  .flex-1 { flex: 1; }
+  .flex-fixed-90 { flex: 0 0 90px; }
+  .justify-end { justify-content: flex-end; }
+  /* Settings' "Get System Data" / "Login" buttons: same a.icon-btn.confirm
+     base as everywhere else, but sized to fit their own text instead of the
+     fixed 40x40 icon-button box. */
+  /* a.icon-btn.settings-cta (not plain .settings-cta): a.icon-btn.cmd-like
+     (see button.icon-btn, a.icon-btn.cmd-like above) has specificity
+     (0,2,1) via its "a" type selector -- a plain single-class
+     .settings-cta is only (0,1,0) and can NEVER win against it regardless
+     of source order, so padding/border-radius silently fell back to
+     cmd-like's 12px 14px/14px instead of this class's intended 11px/12px
+     (verified via getComputedStyle() against a served copy: padding
+     rendered as "12px 14px", border-radius as "14px" before this fix --
+     the same inline-style-replaced-by-plain-class specificity bug class
+     the sibling ios-app repo's review caught, here via a specificity
+     mismatch rather than pure source-order). Matching cmd-like's own
+     (0,2,1) and placing this rule after it in source order settles the
+     tie in this class's favor, the way the inline style="..." it replaced
+     always did unconditionally. */
+  a.icon-btn.settings-cta { width: auto; border-radius: 12px; padding: 11px; }
+
   @media (prefers-reduced-motion: reduce) {
     * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
   }
@@ -531,7 +593,7 @@
 <header>
   <div>
     <h1>MyAir3</h1>
-    <div class="sub"><span class="live-dot" id="live-dot"></span>Living room &middot; auto-refreshing</div>
+    <div class="sub"><span class="live-dot" id="live-dot" title="Not yet connected"></span>Living room &middot; auto-refreshing</div>
   </div>
   <button type="button" class="nav-btn" id="settings-open" aria-label="Open settings">
     <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 0 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 0 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15z"/></svg>
@@ -592,7 +654,7 @@
   <a class="auto-chip cmd" id="link-fan-auto" href="#" target="_blank" rel="noopener">✨ Auto</a>
 </div>
 <input id="fanSpeed" type="number" min="1" max="4" value="2" class="visually-hidden-input" aria-label="Fan speed">
-<div class="note" style="margin-top:-2px; margin-bottom:16px;">Auto sends <code>fanSpeed=auto</code>, unverified on this unit &mdash; check the raw XML if it doesn't take effect.</div>
+<div class="note mt-neg2 mb-16">Auto sends <code>fanSpeed=auto</code>, unverified on this unit &mdash; check the raw XML if it doesn't take effect.</div>
 
 <div>
   <div class="zones-title">Zones</div>
@@ -640,25 +702,34 @@
     </div>
   </div>
 
-  <label>Actual temp &mdash; paste &lt;actualTemp&gt; from Get Zone Data (0.0 usually = no sensor)</label>
-  <input type="text" inputmode="decimal" data-zone-actualtemp-input="" placeholder="e.g. 21.5" aria-label="Manually entered actual temperature">
+  <!-- Wrapped rather than aria-label'd: wrapping the input in its own
+       <label> (no for/id needed) makes the accessible name and the visible
+       label text the same string, satisfying WCAG 2.5.3 "Label in Name" --
+       an aria-label with different wording than the visible text next to it
+       fails that rule even though both individually look reasonable. -->
+  <label>Actual temp &mdash; paste &lt;actualTemp&gt; from Get Zone Data (0.0 usually = no sensor)
+    <input type="text" inputmode="decimal" data-zone-actualtemp-input="" placeholder="e.g. 21.5">
+  </label>
   <small class="foot-status" id="zone-temp-asof">no reading recorded yet</small>
 
-  <div class="card" style="margin-top:14px;">
+  <div class="card mt-14">
     <div class="card-head">
-      <div class="card-title" style="margin:0;">Damper open</div>
+      <div class="card-title m-0">Damper open</div>
       <div class="card-value" id="zone-percent-display-val">80%</div>
     </div>
     <input type="range" min="0" max="100" step="5" value="80" data-zone-percent-input="" data-range-label="#zone-percent-display-val" aria-label="Damper percentage">
-    <div class="row" style="justify-content:flex-end; margin-top:12px;">
+    <div class="row justify-end mt-12">
       <a class="icon-btn confirm cmd" data-zone-percent-link="" href="#" target="_blank" rel="noopener" aria-label="Set damper percentage">✓</a>
     </div>
     <div class="caption">For zones without a temperature sensor.</div>
   </div>
 
-  <label>Zone name (from &lt;name&gt; in Get Zone Data)</label>
-  <input type="text" data-zone-name-input="" placeholder="e.g. SPARE BEDROO" aria-label="Zone name">
-  <div class="caption" style="margin-bottom:14px;">Names over 12 characters get cut off by the unit itself &mdash; not a typo.</div>
+  <!-- Same fix as the actual-temp field above: wrapping instead of a
+       separate (differently-worded) aria-label. -->
+  <label>Zone name (from &lt;name&gt; in Get Zone Data)
+    <input type="text" data-zone-name-input="" placeholder="e.g. SPARE BEDROO">
+  </label>
+  <div class="caption mb-14">Names over 12 characters get cut off by the unit itself &mdash; not a typo.</div>
 
   <details class="advanced-details">
     <summary class="advanced-summary">
@@ -666,9 +737,18 @@
       <svg class="i i-sm chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
     </summary>
     <div class="advanced-body">
-      <div class="row" style="margin-bottom:14px;">
-        <label style="flex:1; margin:0;">Zone setting (used by the ✓ buttons above)</label>
-        <select data-zone-setting="" style="flex:0 0 90px;" aria-label="On/off setting sent with zone commands">
+      <!-- This one sits in a flex row next to its select rather than
+           stacked above it (see .row above), so wrapping the select inside
+           the label like the two fields above would disturb that layout --
+           a stable id + label[for] gets the same "accessible name matches
+           visible text" result (WCAG 2.5.3) without changing the markup
+           structure. Safe as a page-wide-unique id: this <select> is the
+           one reusable data-zone-setting field every zone's Zone Detail
+           screen shares (see openZoneDetail()'s re-pointing comment), not
+           one copy per zone. -->
+      <div class="row mb-14">
+        <label for="zone-setting-select" class="flex-1 m-0">Zone setting (used by the ✓ buttons above)</label>
+        <select id="zone-setting-select" data-zone-setting="" class="flex-fixed-90">
           <option value="1">On</option>
           <option value="0">Off</option>
         </select>
@@ -700,9 +780,9 @@
     <input id="password" value="password">
     <label for="zones">Number of zones</label>
     <input id="zones" type="number" min="1" max="16" value="3">
-    <div class="row" style="margin-top:14px;">
-      <a class="icon-btn confirm data cmd-like grow" id="link-status" href="#" target="_blank" rel="noopener" style="width:auto; border-radius:12px; padding:11px;">Get System Data</a>
-      <a class="icon-btn confirm data cmd-like grow" id="link-login" href="#" target="_blank" rel="noopener" style="width:auto; border-radius:12px; padding:11px;">Login</a>
+    <div class="row mt-14">
+      <a class="icon-btn confirm data cmd-like grow settings-cta" id="link-status" href="#" target="_blank" rel="noopener">Get System Data</a>
+      <a class="icon-btn confirm data cmd-like grow settings-cta" id="link-login" href="#" target="_blank" rel="noopener">Login</a>
     </div>
   </div>
 
@@ -736,7 +816,9 @@ function loadConnSettings() {
     CONN_KEYS.forEach(k => {
       if (saved[k] !== undefined) document.getElementById(k).value = saved[k];
     });
-  } catch (e) {}
+  } catch (e) {
+    console.warn('loadConnSettings: could not read saved connection settings, using markup defaults', e);
+  }
 }
 function saveConnSettings() {
   const settings = {};
@@ -784,19 +866,28 @@ function haptic(kind) {
     else if (kind === 'medium') H.impact({ style: 'Medium' });
     else if (kind === 'success') H.notification({ type: 'Success' });
     else if (kind === 'error') H.notification({ type: 'Error' });
-  } catch (e) {}
+  } catch (e) {
+    console.warn('haptic: Taptic Engine call failed', e);
+  }
 }
+
+// The unit's real desired-temp range -- shared by tempToColor()'s clamp and
+// updateDialRing()'s clamp/fraction math below, and by every temp <input>'s
+// own min/max in the markup, so this is the single place that range lives
+// as a JS value rather than the same 16/30 pair typed out twice.
+const MIN_TEMP = 16;
+const MAX_TEMP = 30;
 
 // Cool blue at the low end, through green, to warm red at the high end --
 // the dial ring recolors live as the target temp is adjusted. Shared by the
 // central dial and every Zone Detail dial.
 function tempToColor(t) {
   const stops = [
-    [16, 59, 130, 246],
+    [MIN_TEMP, 59, 130, 246],
     [23, 34, 197, 94],
-    [30, 239, 68, 68],
+    [MAX_TEMP, 239, 68, 68],
   ];
-  const clamped = Math.min(30, Math.max(16, t));
+  const clamped = Math.min(MAX_TEMP, Math.max(MIN_TEMP, t));
   let lo = stops[0], hi = stops[stops.length - 1];
   for (let i = 0; i < stops.length - 1; i++) {
     if (clamped >= stops[i][0] && clamped <= stops[i + 1][0]) { lo = stops[i]; hi = stops[i + 1]; break; }
@@ -824,8 +915,8 @@ let firstLoadDone = false;
 function updateDialRing(ringId, temp, isOn) {
   const ring = document.getElementById(ringId);
   if (!ring) return;
-  const t = Math.min(30, Math.max(16, parseFloat(temp) || 22));
-  const fraction = isOn ? (t - 16) / 14 : 0;
+  const t = Math.min(MAX_TEMP, Math.max(MIN_TEMP, parseFloat(temp) || 22));
+  const fraction = isOn ? (t - MIN_TEMP) / (MAX_TEMP - MIN_TEMP) : 0;
   const offset = Math.round(DIAL_CIRCUMFERENCE * (1 - fraction) * 100) / 100;
   ring.setAttribute('stroke-dashoffset', String(offset));
   // Obsidian Glass finish: the ring carries its own coloured bloom so the
@@ -842,6 +933,7 @@ function loadZoneNames() {
   try {
     return Object.assign({}, DEFAULT_ZONE_NAMES, JSON.parse(localStorage.getItem('zoneNames') || '{}'));
   } catch (e) {
+    console.warn('loadZoneNames: could not read saved zone names, falling back to defaults', e);
     return Object.assign({}, DEFAULT_ZONE_NAMES);
   }
 }
@@ -855,6 +947,7 @@ function loadZoneTemps() {
   try {
     return JSON.parse(localStorage.getItem('zoneTemps') || '{}');
   } catch (e) {
+    console.warn('loadZoneTemps: could not read saved zone temps, falling back to empty', e);
     return {};
   }
 }
@@ -899,6 +992,37 @@ function renderZones() {
   updateLinks();
 }
 
+// Wires every element carrying data-<attr>="Z" (Z = a zone id, or "" for the
+// reusable Zone Detail fields before openZoneDetail() has pointed them at a
+// real zone -- see the comment above openZoneId) to the URL buildUrl(z)
+// computes for it. Extracted from updateLinks(), which used to repeat this
+// exact query-attribute-guard-build-assign shape 5 times in a row (once each
+// for data-zone-data/-on/-off/-temp-link/-percent-link) with only the
+// attribute name and URL-building logic actually differing between them.
+function wireZoneHrefs(attr, buildUrl) {
+  document.querySelectorAll(`[data-${attr}]`).forEach(a => {
+    const z = a.getAttribute(`data-${attr}`);
+    if (!z) return;
+    a.href = buildUrl(z);
+  });
+}
+
+// Mirrors whichever zone is currently open in Zone Detail -- the dial digits
+// and ring aren't a generic data-zone-* query like the hrefs updateLinks()
+// builds, so they need an explicit sync here (same idea as the central
+// dial's own mirror in updateLinks()). Split out purely to keep
+// updateLinks() itself shorter; called only from there.
+function mirrorOpenZoneDial() {
+  if (openZoneId === null) return;
+  const zTempInput = document.querySelector('[data-zone-temp-input]');
+  const zDisplay = document.getElementById('zone-temp-display');
+  if (!zTempInput || !zDisplay) return;
+  const zTempNum = (parseFloat(zTempInput.value) || 0).toFixed(1);
+  zDisplay.innerHTML = zTempNum + '<span class="dial-unit">°</span>';
+  const setting = document.querySelector('[data-zone-setting]');
+  updateDialRing('zone-dial-ring', zTempInput.value, !!setting && setting.value === '1');
+}
+
 function updateLinks() {
   const b = base();
   const p = pw();
@@ -926,47 +1050,21 @@ function updateLinks() {
   if (centralDisplay) centralDisplay.innerHTML = centralTempNum + '<span class="dial-unit">°</span>';
   updateDialRing('dial-ring', centralTemp, document.getElementById('link-on').classList.contains('active'));
 
-  document.querySelectorAll('[data-zone-data]').forEach(a => {
-    const z = a.getAttribute('data-zone-data');
-    if (!z) return;
-    a.href = `${b}/getZoneData?zone=${z}`;
-  });
-  document.querySelectorAll('[data-zone-on]').forEach(a => {
-    const z = a.getAttribute('data-zone-on');
-    a.href = `${b}/setZoneData?zone=${z}&zoneSetting=1`;
-  });
-  document.querySelectorAll('[data-zone-off]').forEach(a => {
-    const z = a.getAttribute('data-zone-off');
-    a.href = `${b}/setZoneData?zone=${z}&zoneSetting=0`;
-  });
-  document.querySelectorAll('[data-zone-temp-link]').forEach(a => {
-    const z = a.getAttribute('data-zone-temp-link');
-    if (!z) return;
+  wireZoneHrefs('zone-data', z => `${b}/getZoneData?zone=${z}`);
+  wireZoneHrefs('zone-on', z => `${b}/setZoneData?zone=${z}&zoneSetting=1`);
+  wireZoneHrefs('zone-off', z => `${b}/setZoneData?zone=${z}&zoneSetting=0`);
+  wireZoneHrefs('zone-temp-link', z => {
     const temp = document.querySelector(`[data-zone-temp-input="${z}"]`).value;
     const setting = document.querySelector(`[data-zone-setting="${z}"]`).value;
-    a.href = `${b}/setZoneData?zone=${z}&desiredTemp=${encodeURIComponent(temp)}&zoneSetting=${setting}`;
+    return `${b}/setZoneData?zone=${z}&desiredTemp=${encodeURIComponent(temp)}&zoneSetting=${setting}`;
   });
-  document.querySelectorAll('[data-zone-percent-link]').forEach(a => {
-    const z = a.getAttribute('data-zone-percent-link');
-    if (!z) return;
+  wireZoneHrefs('zone-percent-link', z => {
     const percent = document.querySelector(`[data-zone-percent-input="${z}"]`).value;
     const setting = document.querySelector(`[data-zone-setting="${z}"]`).value;
-    a.href = `${b}/setZoneData?zone=${z}&userPercentSetting=${encodeURIComponent(percent)}&zoneSetting=${setting}`;
+    return `${b}/setZoneData?zone=${z}&userPercentSetting=${encodeURIComponent(percent)}&zoneSetting=${setting}`;
   });
 
-  // Mirror whichever zone is currently open in Zone Detail -- the dial digits
-  // and ring aren't a generic data-zone-* query like the hrefs above, so they
-  // need an explicit sync here (same idea as the central dial two lines up).
-  if (openZoneId !== null) {
-    const zTempInput = document.querySelector('[data-zone-temp-input]');
-    const zDisplay = document.getElementById('zone-temp-display');
-    if (zTempInput && zDisplay) {
-      const zTempNum = (parseFloat(zTempInput.value) || 0).toFixed(1);
-      zDisplay.innerHTML = zTempNum + '<span class="dial-unit">°</span>';
-      const setting = document.querySelector('[data-zone-setting]');
-      updateDialRing('zone-dial-ring', zTempInput.value, !!setting && setting.value === '1');
-    }
-  }
+  mirrorOpenZoneDial();
 }
 
 document.addEventListener('input', (e) => {
@@ -1095,6 +1193,15 @@ function describeFetchError(err) {
   return `request failed: "${err.message}". This page can only reach the unit when it's served by server.py, not from GitHub Pages or a raw file.`;
 }
 
+// Timing constants shared across the live-polling/command-sending logic
+// below -- named once here rather than the same literal ms value repeated
+// at every call site (fetchWithTimeout's every caller, startPolling's
+// setInterval, sendCommand's settle delay and its "sent" flash).
+const FETCH_TIMEOUT_MS = 6000;
+const POLL_INTERVAL_MS = 15000;
+const COMMAND_SETTLE_MS = 900;
+const SENT_FLASH_MS = 600;
+
 let pollTimer = null;
 
 // Protects a just-edited field OR a just-tapped toggle button from being
@@ -1157,6 +1264,163 @@ function getAssociatedInputs(link) {
   return [];
 }
 
+// Parses getSystemData's XML and reflects it onto the power/mode buttons,
+// fan speed, central temp input/display, dial ring and status caption.
+// Split out of refreshState() (which used to inline all of this) so that
+// function stays a thin orchestrator -- called from inside refreshState()'s
+// own try/catch, so a parse/DOM error here still surfaces as a caught
+// refreshState() failure exactly as before the split.
+function applySystemState(sysXml) {
+  const onOff = parseXmlTag(sysXml, 'airconOnOff');
+  const mode = parseXmlTag(sysXml, 'mode');
+  const fanSpeed = parseXmlTag(sysXml, 'fanSpeed');
+  const centralDesiredTemp = parseXmlTag(sysXml, 'centralDesiredTemp');
+  const centralActualTemp = parseXmlTag(sysXml, 'centralActualTemp');
+
+  setActive('link-on', onOff === '1');
+  setActive('link-off', onOff === '0');
+  setActive('link-mode-1', mode === '1');
+  setActive('link-mode-2', mode === '2');
+  setActive('link-mode-3', mode === '3');
+  const centralTempInput = document.getElementById('centralTemp');
+  setValueUnlessFocused(document.getElementById('fanSpeed'), fanSpeed);
+  setValueUnlessFocused(centralTempInput, centralDesiredTemp);
+  const fanDisplay = document.getElementById('fan-speed-display');
+  if (fanDisplay) fanDisplay.textContent = document.getElementById('fanSpeed').value;
+  // Mirror the INPUT, not the raw response. setValueUnlessFocused() may have
+  // declined the write (field focused, or inside its grace window), and
+  // painting the response straight onto the big display anyway would leave
+  // it contradicting the field it labels -- the field keeping your 24.5
+  // while the headline number snaps back to 22.0 looks just as much like
+  // "the change didn't take" as the button reverting did.
+  const centralDisplay = document.getElementById('central-temp-display');
+  if (centralDisplay && centralTempInput) {
+    centralDisplay.innerHTML = (parseFloat(centralTempInput.value) || 0).toFixed(1) + '<span class="dial-unit">°</span>';
+  }
+  // Read link-on's own (just-protected) classList rather than the raw
+  // onOff response -- same bug class as the grace-window checks above:
+  // painting straight from the fetch would let a display flash back to
+  // "off" during another control's grace window even though link-on
+  // correctly held "on". Read once and reuse for every mirror below so
+  // the ring and the caption never disagree with each other or with the
+  // button.
+  const centralOn = document.getElementById('link-on').classList.contains('active');
+  updateDialRing('dial-ring', centralTempInput ? centralTempInput.value : null, centralOn);
+
+  const note = document.getElementById('central-state-note');
+  if (note) {
+    // Same fix as the ring above: derive the label from centralOn (the
+    // protected classList), not the raw onOff response, or this caption
+    // could show "Unit is OFF" while the button right above it correctly
+    // still shows ON.
+    const onOffLabel = centralOn ? 'ON' : (onOff === '0' ? 'OFF' : '?');
+    note.textContent = `Unit is ${onOffLabel}. Actual temp: ${centralActualTemp ?? '?'}°C.`;
+  }
+}
+
+// Parses one zone's getZoneData XML and reflects it onto that zone's tile
+// (on/off buttons, icon tint) and, if this zone is the one currently open in
+// Zone Detail, that screen's dial/stat mirrors too. Split out of
+// refreshState() the same way applySystemState() was; called from inside its
+// per-zone try/catch, so a parse/DOM error for one zone doesn't stop the
+// others in the same Promise.allSettled batch.
+function applyZoneState(z, xml) {
+  const setting = parseXmlTag(xml, 'setting');
+  const percent = parseXmlTag(xml, 'userPercentSetting');
+  const desiredTemp = parseXmlTag(xml, 'desiredTemp');
+  const actualTemp = parseXmlTag(xml, 'actualTemp');
+
+  const onBtn = document.querySelector(`[data-zone-on="${z}"]`);
+  const offBtn = document.querySelector(`[data-zone-off="${z}"]`);
+  setActiveEl(onBtn, setting === '1');
+  setActiveEl(offBtn, setting === '0');
+  // Read back onBtn's own (just-protected) classList rather than the raw
+  // setting response -- same bug class as the dial-ring fix above: this
+  // tile could otherwise flash to the wrong color during onBtn's own
+  // grace window, even though onBtn itself correctly held its state.
+  const tile = onBtn ? onBtn.closest('.zone-tile') : null;
+  if (tile) tile.classList.toggle('on', !!(onBtn && onBtn.classList.contains('active')));
+  // Ties the tile's icon color to the same gradient the dial uses, so
+  // the dashboard reads as one coherent temp language instead of two.
+  // Only the OFF-state icon rule actually uses these (see the CSS) --
+  // .on keeps its flat white-on-accent treatment, since on/off stays
+  // the primary signal here. Guarded the same way every other
+  // parseFloat() in this file is (updateDialRing, the temp displays):
+  // an unparseable desiredTemp (present-but-empty/non-numeric tag) must
+  // not reach tempToColor(), because a NaN component makes it return
+  // "rgb(NaN, NaN, NaN)" -- an invalid custom-property value. Per the
+  // CSS custom-properties spec, an *invalid* var() value does NOT fall
+  // back to the var()'s second argument (that fallback only applies
+  // when the property is undefined) -- it makes the property invalid
+  // at computed-value time instead, so background/color would resolve
+  // to transparent/inherited-black instead of --card-2/--muted,
+  // leaving the icon looking broken rather than merely un-tinted.
+  const parsedDesiredTemp = parseFloat(desiredTemp);
+  if (tile && desiredTemp !== null && !Number.isNaN(parsedDesiredTemp)) {
+    const tint = tempToColor(parsedDesiredTemp);
+    tile.style.setProperty('--zone-temp-color', tint);
+    tile.style.setProperty('--zone-temp-tint', tint.replace('rgb(', 'rgba(').replace(')', ', 0.18)'));
+  }
+
+  // Same helper as every other value write, rather than a bespoke
+  // focus-only check: this select is not just a readout, its value is
+  // baked into the zone's temp/damper command URLs, so a stale refresh
+  // overwriting it changes what the next ✓ tap actually sends.
+  const settingSelect = document.querySelector(`[data-zone-setting="${z}"]`);
+  setValueUnlessFocused(settingSelect, setting);
+  const tempInput = document.querySelector(`[data-zone-temp-input="${z}"]`);
+  setValueUnlessFocused(tempInput, desiredTemp);
+  const percentInput = document.querySelector(`[data-zone-percent-input="${z}"]`);
+  setValueUnlessFocused(percentInput, percent);
+  // Mirrors the slider for the same reason the central display mirrors
+  // its input -- see the comment above.
+  const percentDisplay = document.getElementById('zone-percent-display-val');
+  if (percentDisplay && percentInput && String(z) === String(openZoneId)) percentDisplay.textContent = percentInput.value + '%';
+
+  if (String(z) === String(openZoneId)) {
+    const zDisplay = document.getElementById('zone-temp-display');
+    if (zDisplay && tempInput) zDisplay.innerHTML = (parseFloat(tempInput.value) || 0).toFixed(1) + '<span class="dial-unit">°</span>';
+    // Read the select's own (just-protected) value rather than the raw
+    // setting response, same bug class as above -- these two mirrors
+    // would otherwise flash back to stale during settingSelect's own
+    // grace window even though the select itself correctly held its value.
+    const zoneOn = settingSelect ? settingSelect.value : setting;
+    updateDialRing('zone-dial-ring', tempInput ? tempInput.value : null, zoneOn === '1');
+    const stateDisplay = document.getElementById('zone-state-display');
+    if (stateDisplay) {
+      stateDisplay.textContent = zoneOn === '1' ? 'On' : zoneOn === '0' ? 'Off' : '?';
+      stateDisplay.className = 'stat-value ' + (zoneOn === '1' ? 'state-on' : zoneOn === '0' ? 'state-off' : '');
+    }
+  }
+
+  if (actualTemp !== null) {
+    saveZoneTemp(z, actualTemp);
+    updateZoneTempUI(z, actualTemp, 'live');
+  }
+}
+
+// Updates the Settings-screen status caption and the header's live-connection
+// dot to reflect how refreshState()'s last read went. Also sets a `title` on
+// the dot -- ok/partial/error was previously conveyed by its background
+// colour alone (a WCAG "use of color" failure), so this gives it a non-colour
+// signal too; the status caption text next to it already spells out the same
+// three states in words for anyone reading rather than glancing at the dot.
+function updateStatusLine(okCount, lastError) {
+  const time = new Date().toLocaleTimeString();
+  const statusEl = document.getElementById('live-poll-status');
+  const dot = document.getElementById('live-dot');
+  if (okCount > 0 && !lastError) {
+    statusEl.textContent = `Reflecting live state — last updated ${time}.`;
+    if (dot) { dot.className = 'live-dot ok'; dot.title = 'Connected: reflecting live state'; }
+  } else if (okCount > 0 && lastError) {
+    statusEl.textContent = `Partially reflecting live state (some requests failed) — last updated ${time}.`;
+    if (dot) { dot.className = 'live-dot partial'; dot.title = 'Partially connected: some requests failed'; }
+  } else {
+    statusEl.textContent = `Couldn't read current state as of ${time}: ${describeFetchError(lastError)}`;
+    if (dot) { dot.className = 'live-dot error'; dot.title = 'Connection error: could not read state'; }
+  }
+}
+
 // Reads getSystemData + every zone's getZoneData and reflects the real device
 // state onto the controls (which button is active, current fan/temp/damper
 // values) instead of leaving buttons looking the same regardless of what the
@@ -1168,52 +1432,8 @@ async function refreshState() {
   let lastError = null;
 
   try {
-    const sysXml = await fetchWithTimeout(proxyPath('/getSystemData'), 6000);
-    const onOff = parseXmlTag(sysXml, 'airconOnOff');
-    const mode = parseXmlTag(sysXml, 'mode');
-    const fanSpeed = parseXmlTag(sysXml, 'fanSpeed');
-    const centralDesiredTemp = parseXmlTag(sysXml, 'centralDesiredTemp');
-    const centralActualTemp = parseXmlTag(sysXml, 'centralActualTemp');
-
-    setActive('link-on', onOff === '1');
-    setActive('link-off', onOff === '0');
-    setActive('link-mode-1', mode === '1');
-    setActive('link-mode-2', mode === '2');
-    setActive('link-mode-3', mode === '3');
-    const centralTempInput = document.getElementById('centralTemp');
-    setValueUnlessFocused(document.getElementById('fanSpeed'), fanSpeed);
-    setValueUnlessFocused(centralTempInput, centralDesiredTemp);
-    const fanDisplay = document.getElementById('fan-speed-display');
-    if (fanDisplay) fanDisplay.textContent = document.getElementById('fanSpeed').value;
-    // Mirror the INPUT, not the raw response. setValueUnlessFocused() may have
-    // declined the write (field focused, or inside its grace window), and
-    // painting the response straight onto the big display anyway would leave
-    // it contradicting the field it labels -- the field keeping your 24.5
-    // while the headline number snaps back to 22.0 looks just as much like
-    // "the change didn't take" as the button reverting did.
-    const centralDisplay = document.getElementById('central-temp-display');
-    if (centralDisplay && centralTempInput) {
-      centralDisplay.innerHTML = (parseFloat(centralTempInput.value) || 0).toFixed(1) + '<span class="dial-unit">°</span>';
-    }
-    // Read link-on's own (just-protected) classList rather than the raw
-    // onOff response -- same bug class as the grace-window checks above:
-    // painting straight from the fetch would let a display flash back to
-    // "off" during another control's grace window even though link-on
-    // correctly held "on". Read once and reuse for every mirror below so
-    // the ring and the caption never disagree with each other or with the
-    // button.
-    const centralOn = document.getElementById('link-on').classList.contains('active');
-    updateDialRing('dial-ring', centralTempInput ? centralTempInput.value : null, centralOn);
-
-    const note = document.getElementById('central-state-note');
-    if (note) {
-      // Same fix as the ring above: derive the label from centralOn (the
-      // protected classList), not the raw onOff response, or this caption
-      // could show "Unit is OFF" while the button right above it correctly
-      // still shows ON.
-      const onOffLabel = centralOn ? 'ON' : (onOff === '0' ? 'OFF' : '?');
-      note.textContent = `Unit is ${onOffLabel}. Actual temp: ${centralActualTemp ?? '?'}°C.`;
-    }
+    const sysXml = await fetchWithTimeout(proxyPath('/getSystemData'), FETCH_TIMEOUT_MS);
+    applySystemState(sysXml);
     okCount++;
   } catch (err) {
     lastError = err;
@@ -1225,7 +1445,7 @@ async function refreshState() {
   // several seconds to show as selected after a tap.
   const zoneResults = await Promise.allSettled(
     Array.from({ length: n }, (_, i) => i + 1).map(z =>
-      fetchWithTimeout(proxyPath(`/getZoneData?zone=${z}`), 6000).then(xml => ({ z, xml }))
+      fetchWithTimeout(proxyPath(`/getZoneData?zone=${z}`), FETCH_TIMEOUT_MS).then(xml => ({ z, xml }))
     )
   );
   for (const result of zoneResults) {
@@ -1234,98 +1454,14 @@ async function refreshState() {
       continue;
     }
     try {
-      const { z, xml } = result.value;
-      const setting = parseXmlTag(xml, 'setting');
-      const percent = parseXmlTag(xml, 'userPercentSetting');
-      const desiredTemp = parseXmlTag(xml, 'desiredTemp');
-      const actualTemp = parseXmlTag(xml, 'actualTemp');
-
-      const onBtn = document.querySelector(`[data-zone-on="${z}"]`);
-      const offBtn = document.querySelector(`[data-zone-off="${z}"]`);
-      setActiveEl(onBtn, setting === '1');
-      setActiveEl(offBtn, setting === '0');
-      // Read back onBtn's own (just-protected) classList rather than the raw
-      // setting response -- same bug class as the dial-ring fix above: this
-      // tile could otherwise flash to the wrong color during onBtn's own
-      // grace window, even though onBtn itself correctly held its state.
-      const tile = onBtn ? onBtn.closest('.zone-tile') : null;
-      if (tile) tile.classList.toggle('on', !!(onBtn && onBtn.classList.contains('active')));
-      // Ties the tile's icon color to the same gradient the dial uses, so
-      // the dashboard reads as one coherent temp language instead of two.
-      // Only the OFF-state icon rule actually uses these (see the CSS) --
-      // .on keeps its flat white-on-accent treatment, since on/off stays
-      // the primary signal here. Guarded the same way every other
-      // parseFloat() in this file is (updateDialRing, the temp displays):
-      // an unparseable desiredTemp (present-but-empty/non-numeric tag) must
-      // not reach tempToColor(), because a NaN component makes it return
-      // "rgb(NaN, NaN, NaN)" -- an invalid custom-property value. Per the
-      // CSS custom-properties spec, an *invalid* var() value does NOT fall
-      // back to the var()'s second argument (that fallback only applies
-      // when the property is undefined) -- it makes the property invalid
-      // at computed-value time instead, so background/color would resolve
-      // to transparent/inherited-black instead of --card-2/--muted,
-      // leaving the icon looking broken rather than merely un-tinted.
-      const parsedDesiredTemp = parseFloat(desiredTemp);
-      if (tile && desiredTemp !== null && !Number.isNaN(parsedDesiredTemp)) {
-        const tint = tempToColor(parsedDesiredTemp);
-        tile.style.setProperty('--zone-temp-color', tint);
-        tile.style.setProperty('--zone-temp-tint', tint.replace('rgb(', 'rgba(').replace(')', ', 0.18)'));
-      }
-
-      // Same helper as every other value write, rather than a bespoke
-      // focus-only check: this select is not just a readout, its value is
-      // baked into the zone's temp/damper command URLs, so a stale refresh
-      // overwriting it changes what the next ✓ tap actually sends.
-      const settingSelect = document.querySelector(`[data-zone-setting="${z}"]`);
-      setValueUnlessFocused(settingSelect, setting);
-      const tempInput = document.querySelector(`[data-zone-temp-input="${z}"]`);
-      setValueUnlessFocused(tempInput, desiredTemp);
-      const percentInput = document.querySelector(`[data-zone-percent-input="${z}"]`);
-      setValueUnlessFocused(percentInput, percent);
-      // Mirrors the slider for the same reason the central display mirrors
-      // its input -- see the comment above.
-      const percentDisplay = document.getElementById('zone-percent-display-val');
-      if (percentDisplay && percentInput && String(z) === String(openZoneId)) percentDisplay.textContent = percentInput.value + '%';
-
-      if (String(z) === String(openZoneId)) {
-        const zDisplay = document.getElementById('zone-temp-display');
-        if (zDisplay && tempInput) zDisplay.innerHTML = (parseFloat(tempInput.value) || 0).toFixed(1) + '<span class="dial-unit">°</span>';
-        // Read the select's own (just-protected) value rather than the raw
-        // setting response, same bug class as above -- these two mirrors
-        // would otherwise flash back to stale during settingSelect's own
-        // grace window even though the select itself correctly held its value.
-        const zoneOn = settingSelect ? settingSelect.value : setting;
-        updateDialRing('zone-dial-ring', tempInput ? tempInput.value : null, zoneOn === '1');
-        const stateDisplay = document.getElementById('zone-state-display');
-        if (stateDisplay) {
-          stateDisplay.textContent = zoneOn === '1' ? 'On' : zoneOn === '0' ? 'Off' : '?';
-          stateDisplay.className = 'stat-value ' + (zoneOn === '1' ? 'state-on' : zoneOn === '0' ? 'state-off' : '');
-        }
-      }
-
-      if (actualTemp !== null) {
-        saveZoneTemp(z, actualTemp);
-        updateZoneTempUI(z, actualTemp, 'live');
-      }
+      applyZoneState(result.value.z, result.value.xml);
       okCount++;
     } catch (err) {
       lastError = err;
     }
   }
 
-  const time = new Date().toLocaleTimeString();
-  const statusEl = document.getElementById('live-poll-status');
-  const dot = document.getElementById('live-dot');
-  if (okCount > 0 && !lastError) {
-    statusEl.textContent = `Reflecting live state — last updated ${time}.`;
-    if (dot) dot.className = 'live-dot ok';
-  } else if (okCount > 0 && lastError) {
-    statusEl.textContent = `Partially reflecting live state (some requests failed) — last updated ${time}.`;
-    if (dot) dot.className = 'live-dot partial';
-  } else {
-    statusEl.textContent = `Couldn't read current state as of ${time}: ${describeFetchError(lastError)}`;
-    if (dot) dot.className = 'live-dot error';
-  }
+  updateStatusLine(okCount, lastError);
   // Only the very first read (page-load) is behind the shimmer -- later
   // auto-refreshes/manual reads update state in place without it.
   if (!firstLoadDone) {
@@ -1338,7 +1474,7 @@ function startPolling() {
   stopPolling();
   pollTimer = setInterval(() => {
     if (document.visibilityState === 'visible') refreshState();
-  }, 15000);
+  }, POLL_INTERVAL_MS);
 }
 function stopPolling() {
   if (pollTimer) clearInterval(pollTimer);
@@ -1448,7 +1584,7 @@ document.addEventListener('click', async (e) => {
   sheet.style.display = 'block';
   out.textContent = 'Loading…';
   try {
-    out.textContent = await fetchWithTimeout(proxyPath(relPath), 6000);
+    out.textContent = await fetchWithTimeout(proxyPath(relPath), FETCH_TIMEOUT_MS);
     haptic('success');
   } catch (err) {
     out.textContent = `Failed: ${describeFetchError(err)}`;
@@ -1493,19 +1629,11 @@ document.getElementById('settings-close').addEventListener('click', () => {
 });
 
 // Re-points every reusable data-zone-* field inside #zone-view at zone `z`
-// (a single set of elements, not one copy per zone -- see the openZoneId
-// comment above) and shows the screen. Existing generic data-zone-* queries
-// in updateLinks()/refreshState()/getAssociatedInputs() need no changes at
-// all: they already loop over "however many elements match," which
-// degrades correctly from N per-zone copies to this one reusable set.
-function openZoneDetail(z) {
-  openZoneId = z;
-  const names = loadZoneNames();
-  const temps = loadZoneTemps();
-  const zoneName = names[z] || ('Zone ' + z);
-  document.getElementById('zone-view-name').textContent = zoneName;
-  document.getElementById('zone-view-sub').textContent = 'Zone ' + z;
-
+// and drops any leftover grace-window protection on them first. Split out of
+// openZoneDetail() to keep that function under CODE_STANDARDS.md's
+// function-size guidance; returns the elements it just re-pointed so the
+// caller can populate them without re-querying the DOM a second time.
+function repointZoneFields(z) {
   const tempLink = document.querySelector('[data-zone-temp-link]');
   const tempInput = document.querySelector('[data-zone-temp-input]');
   const percentLink = document.querySelector('[data-zone-percent-link]');
@@ -1531,6 +1659,25 @@ function openZoneDetail(z) {
   nameInput.setAttribute('data-zone-name-input', z);
   actualTempInput.setAttribute('data-zone-actualtemp-input', z);
   dataLink.setAttribute('data-zone-data', z);
+
+  return { tempInput, percentInput, settingSelect, nameInput, actualTempInput };
+}
+
+// Re-points every reusable data-zone-* field inside #zone-view at zone `z`
+// (a single set of elements, not one copy per zone -- see the openZoneId
+// comment above) and shows the screen. Existing generic data-zone-* queries
+// in updateLinks()/refreshState()/getAssociatedInputs() need no changes at
+// all: they already loop over "however many elements match," which
+// degrades correctly from N per-zone copies to this one reusable set.
+function openZoneDetail(z) {
+  openZoneId = z;
+  const names = loadZoneNames();
+  const temps = loadZoneTemps();
+  const zoneName = names[z] || ('Zone ' + z);
+  document.getElementById('zone-view-name').textContent = zoneName;
+  document.getElementById('zone-view-sub').textContent = 'Zone ' + z;
+
+  const { tempInput, percentInput, settingSelect, nameInput, actualTempInput } = repointZoneFields(z);
 
   // Reset to neutral placeholders immediately rather than leaving the
   // PREVIOUS zone's actual values in place under this zone's name: besides
@@ -1560,6 +1707,52 @@ document.getElementById('zone-back').addEventListener('click', () => {
   openZoneId = null;
 });
 
+// Called once fetchWithTimeout() resolves successfully for a sent command.
+// Split out of sendCommand() to keep that function under
+// CODE_STANDARDS.md's function-size guidance; every comment here explaining
+// WHY moved verbatim with the code it was attached to.
+async function handleCommandSuccess(link, stillOnSameZone) {
+  link.classList.remove('pending');
+  link.classList.add('sent');
+  haptic('success');
+  setTimeout(() => link.classList.remove('sent'), SENT_FLASH_MS);
+  // Protect the field this command was for -- even the delayed refresh
+  // below, or the 15s auto-refresh, or a refresh from switching back to
+  // the app, could otherwise land before the unit finishes applying the
+  // change and stomp your entry back to the old value. Skipped if the
+  // zone has since changed (see sentForZone above) -- these fields no
+  // longer belong to the zone this command was for.
+  if (stillOnSameZone()) getAssociatedInputs(link).forEach(el => markRecentlySent(el));
+  // Give the unit a moment to actually apply the change before re-reading
+  // its state -- querying immediately can race the unit's own internal
+  // update and read back the pre-change value, which then overwrites
+  // whatever you just typed (looks like your input "didn't take").
+  await new Promise(r => setTimeout(r, COMMAND_SETTLE_MS));
+  await refreshState();
+}
+
+// Called when fetchWithTimeout() rejects for a sent command. Same
+// extraction reasoning as handleCommandSuccess() above.
+function handleCommandFailure(link, href, err, stillOnSameZone) {
+  link.classList.remove('pending');
+  haptic('error');
+  // The command never reached the unit, so the optimistic highlight applied
+  // on tap (and any field this command carried) is now known-wrong. Drop the
+  // grace window immediately instead of letting it shield that wrong state
+  // for the full 5s -- otherwise the one case where we're certain the
+  // optimistic guess is bad is also the case refreshState() is forbidden
+  // from fixing.
+  for (const el of optimisticPeerGroup(link)) clearRecentlySent(el);
+  if (stillOnSameZone()) for (const el of getAssociatedInputs(link)) clearRecentlySent(el);
+  const statusEl = document.getElementById('live-poll-status');
+  if (isNative()) {
+    if (statusEl) statusEl.textContent = `Command failed to send: ${describeFetchError(err)}`;
+  } else {
+    if (statusEl) statusEl.textContent = `Couldn't send silently (${describeFetchError(err)}) — opened directly instead.`;
+    window.open(href, '_blank', 'noopener');
+  }
+}
+
 async function sendCommand(link) {
   const href = link.getAttribute('href');
   const b = base();
@@ -1582,42 +1775,10 @@ async function sendCommand(link) {
   link.classList.add('pending');
 
   try {
-    await fetchWithTimeout(proxyPath(relPath), 6000);
-    link.classList.remove('pending');
-    link.classList.add('sent');
-    haptic('success');
-    setTimeout(() => link.classList.remove('sent'), 600);
-    // Protect the field this command was for -- even the delayed refresh
-    // below, or the 15s auto-refresh, or a refresh from switching back to
-    // the app, could otherwise land before the unit finishes applying the
-    // change and stomp your entry back to the old value. Skipped if the
-    // zone has since changed (see sentForZone above) -- these fields no
-    // longer belong to the zone this command was for.
-    if (stillOnSameZone()) getAssociatedInputs(link).forEach(el => markRecentlySent(el));
-    // Give the unit a moment to actually apply the change before re-reading
-    // its state -- querying immediately can race the unit's own internal
-    // update and read back the pre-change value, which then overwrites
-    // whatever you just typed (looks like your input "didn't take").
-    await new Promise(r => setTimeout(r, 900));
-    await refreshState();
+    await fetchWithTimeout(proxyPath(relPath), FETCH_TIMEOUT_MS);
+    await handleCommandSuccess(link, stillOnSameZone);
   } catch (err) {
-    link.classList.remove('pending');
-    haptic('error');
-    // The command never reached the unit, so the optimistic highlight applied
-    // on tap (and any field this command carried) is now known-wrong. Drop the
-    // grace window immediately instead of letting it shield that wrong state
-    // for the full 5s -- otherwise the one case where we're certain the
-    // optimistic guess is bad is also the case refreshState() is forbidden
-    // from fixing.
-    for (const el of optimisticPeerGroup(link)) clearRecentlySent(el);
-    if (stillOnSameZone()) for (const el of getAssociatedInputs(link)) clearRecentlySent(el);
-    const statusEl = document.getElementById('live-poll-status');
-    if (isNative()) {
-      if (statusEl) statusEl.textContent = `Command failed to send: ${describeFetchError(err)}`;
-    } else {
-      if (statusEl) statusEl.textContent = `Couldn't send silently (${describeFetchError(err)}) — opened directly instead.`;
-      window.open(href, '_blank', 'noopener');
-    }
+    handleCommandFailure(link, href, err, stillOnSameZone);
   }
 }
 
