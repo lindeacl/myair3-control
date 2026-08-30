@@ -358,6 +358,120 @@ test('a failed command releases its grace window so the next refresh corrects th
   await expect(page.locator('#link-on')).not.toHaveClass(/active/, { timeout: 3000 });
 });
 
+// Test Effectiveness Audit (final report), HIGH: handleCommandFailure()'s
+// stillOnSameZone() guard (index.html ~1746) had zero coverage -- a
+// mutation inverting it (`if (stillOnSameZone())` -> `if
+// (!stillOnSameZone())`) survived the full suite untouched. The guard
+// exists because getAssociatedInputs(link) (index.html ~1251) re-reads
+// link's CURRENT data-zone-temp-link/data-zone-percent-link attribute, and
+// link is one of #zone-view's reusable elements -- openZoneDetail()
+// (index.html ~1672) can re-point that SAME element to a different zone
+// while an earlier command for it is still in flight (see the comment at
+// sendCommand()'s sentForZone, ~1761). Without the guard, a failed command
+// for a zone you've since left would call getAssociatedInputs(link) AFTER
+// the re-point, incorrectly clearRecentlySent() on the NEW zone's fields --
+// dropping a grace window that has nothing to do with this failure -- when
+// it should be scoped to only the zone the command was actually sent for.
+//
+// This test opens zone 1, sends its temp command but holds the response in
+// flight, switches to zone 2 and gives zone 2's temp field its own genuine
+// grace-protected value, THEN lets zone 1's command fail. It asserts zone
+// 2's protected value survives an immediate stale refresh afterward --
+// proving the failure was scoped to zone 1, not zone 2.
+//
+// Fail-before/pass-after (DEFECT_DISCIPLINE.md Rule 6): verified by
+// temporarily reintroducing the exact mutation above in index.html and
+// running only this test. Observed failure: the final assertion failed --
+// zoneTempInput read back '22' (the stale controller value) instead of the
+// '27' the test had just set, because the inverted guard let zone 1's
+// failure clear zone 2's still-active grace window, letting the forced
+// refresh stomp it. The mutation was reverted immediately via `git checkout
+// -- index.html`, confirmed clean, before any other step; this file's
+// non-mutated version is what actually ships, and passes against it.
+test("a failed command's grace-window release stays scoped to the zone it was sent for, not a zone switched to while it was in flight", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.open = () => null; // swallow the web fallback's popup; not what this test is about
+  });
+  await mockController(page, { staleGetSystemData: true });
+  await page.goto('/index.html');
+
+  // Hold zone 1's setZoneData in flight until the test releases it, then
+  // fail it. Zone 2's own setZoneData (and every getZoneData read) falls
+  // through untouched to mockController's normal route via route.fallback().
+  let releaseZone1;
+  const zone1Gate = new Promise((resolve) => {
+    releaseZone1 = resolve;
+  });
+  await page.route('**/proxy/setZoneData**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get('zone') !== '1') return route.fallback();
+    await zone1Gate;
+    return route.abort('failed');
+  });
+
+  // The confirm link is ONE reusable element re-pointed to whichever zone is
+  // open (see the file-level comment on openZoneDetail() re-pointing) -- a
+  // selector keyed on data-zone-temp-link="1" would stop matching the
+  // instant the zone switch below re-points it to "2", so this test locates
+  // it by its stable position/class instead, valid across the whole test.
+  const zoneConfirmLink = page.locator('#zone-view .dial-center .confirm.cmd');
+
+  // Open zone 1 and send its temp command -- this request hangs on the gate
+  // above until released, well after the zone switch below.
+  await page.locator('[data-zone-open="1"]').click();
+  await zoneConfirmLink.click();
+  await expect(zoneConfirmLink).toHaveClass(/pending/);
+
+  // Switch to zone 2 WHILE zone 1's command is still in flight -- this
+  // re-points the same reusable elements' data-zone-* attributes to zone 2,
+  // which is exactly what getAssociatedInputs(link) re-reads later.
+  await page.locator('#zone-back').click();
+  await page.locator('[data-zone-open="2"]').click();
+
+  // Give zone 2 a distinctive, grace-protected value via a real successful
+  // command.
+  const zoneTempInput = page.locator('[data-zone-temp-input="2"]');
+  await zoneTempInput.fill('27');
+  await zoneTempInput.dispatchEvent('input');
+  const zone2Request = page.waitForRequest(
+    (req) =>
+      req.url().includes('/setZoneData') &&
+      req.url().includes('zone=2') &&
+      req.url().includes('desiredTemp=27'),
+  );
+  await zoneConfirmLink.click();
+  await zone2Request;
+  // Give handleCommandSuccess's own delayed refreshState() (900ms later)
+  // time to run against the stale snapshot -- confirms zone 2's grace
+  // window already holds on its own, so the final assertion below is
+  // actually testing zone 1's failure, not just re-proving this base case.
+  await page.waitForTimeout(1200);
+  await expect(zoneTempInput).toHaveValue('27');
+
+  // NOW let zone 1's held command fail. Its stillOnSameZone() must see the
+  // app is on zone 2, not zone 1, and skip clearing zone 2's grace window.
+  releaseZone1();
+  await expect(zoneConfirmLink).not.toHaveClass(/pending/, {
+    timeout: 3000,
+  });
+
+  // Force an immediate refresh (same trick as "a failed command releases
+  // its grace window..." above) against the stale snapshot. If
+  // handleCommandFailure() incorrectly cleared zone 2's protection, this
+  // stomps the field back to the stale '22'. #settings-open only lives on
+  // #main-view, so back out of zone-view first -- the field being checked
+  // is one of #zone-view's reusable elements and stays in the DOM (and
+  // keeps its value) regardless of which screen is visible.
+  await page.locator('#zone-back').click();
+  await page.locator('#settings-open').click();
+  await page.locator('#live-poll-toggle').check();
+  await page.waitForTimeout(500);
+
+  await expect(zoneTempInput).toHaveValue('27');
+});
+
 test('connection settings persist across reload via localStorage', async ({ page }) => {
   await mockController(page);
   await page.goto('/index.html');
@@ -675,4 +789,171 @@ test('a zone with a non-numeric desiredTemp does not corrupt the tile icon color
   const icon = page.locator('[data-zone-open="1"] .zone-tile-icon');
   const bg = await icon.evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(bg).not.toBe('rgba(0, 0, 0, 0)'); // would be transparent if the invalid var() had been set
+});
+
+// TEA-0002 (HIGH): updateDialRing() (index.html ~line 915) had zero
+// assertions anywhere in this suite -- a mutation inverting its on/off color
+// branch (`isOn ? tempToColor(t) : 'rgba(255,255,255,0.12)'` flipped to
+// `!isOn ? ... : ...`) survived the full 30-test suite untouched. This test
+// drives the real #dial-ring through the actual Power button and central
+// temp field (not a reimplementation of updateDialRing()'s own logic --
+// DEFECT_DISCIPLINE.md Rule 2) and asserts its `stroke` attribute genuinely
+// differs between on/off and across distinct temps. applyOptimisticActive()
+// (index.html ~line 1556) sets the ring synchronously on click/input, so no
+// network wait is needed for any of the three assertions below.
+//
+// Fail-before/pass-after (DEFECT_DISCIPLINE.md Rule 6): verified by
+// temporarily reintroducing the exact mutation above in index.html (the
+// `isOn ? tempToColor(t) : ...` -> `!isOn ? tempToColor(t) : ...` flip) and
+// running only this test. Observed failure: assertion (a) itself failed --
+// with the branch inverted, clicking Power ON produced the flat off-color
+// ('rgba(255, 255, 255, 0.12)') instead of a temp-based rgb(), so the very
+// first assertion never matched the expected rgb() pattern (it never even
+// reached the (c) off-state assertion). The mutation was reverted
+// immediately after via `git checkout -- index.html`, confirmed clean, before
+// any other step; this file's non-mutated version is what actually ships,
+// and passes against it (see the run above this comment was written from).
+test('dial ring color reflects on/off state and desired temp, not just executes updateDialRing()', async ({
+  page,
+}) => {
+  await mockController(page);
+  await page.goto('/index.html');
+
+  const ring = page.locator('#dial-ring');
+  const tempInput = page.locator('#centralTemp');
+
+  // (a) unit ON at the default temp (22) -- a real temp-based color.
+  await page.locator('#link-on').click();
+  const colorAt22 = await ring.getAttribute('stroke');
+  expect(colorAt22).toMatch(/^rgb\(\d{1,3}, \d{1,3}, \d{1,3}\)$/);
+
+  // (b) unit ON at a distinct temp -- a genuinely different color, proving
+  // the ring isn't just frozen at whatever it first computed.
+  await tempInput.fill('28');
+  await tempInput.dispatchEvent('input');
+  const colorAt28 = await ring.getAttribute('stroke');
+  expect(colorAt28).toMatch(/^rgb\(\d{1,3}, \d{1,3}, \d{1,3}\)$/);
+  expect(colorAt28).not.toBe(colorAt22);
+
+  // (c) unit OFF -- the flat, non-temp-based off color, not a tempToColor()
+  // rgb() at all. This is the branch the mutation above inverts.
+  await page.locator('#link-off').click();
+  const colorOff = await ring.getAttribute('stroke');
+  expect(colorOff).toBe('rgba(255, 255, 255, 0.12)');
+  expect(colorOff).not.toBe(colorAt28);
+});
+
+// TEA-0003 (HIGH): zone name editing ([data-zone-name-input], index.html
+// ~line 730, wired ~line 1071) had zero test coverage despite being a real,
+// localStorage-persisted feature. Asserts the edit propagates to BOTH the
+// zone tile label (data-zone-title-name) and the Zone Detail header
+// (#zone-view-name) live, and survives a reload -- same
+// localStorage-persistence pattern as "connection settings persist across
+// reload via localStorage" above (no explicit re-seed needed: localStorage
+// naturally survives page.reload() on the same origin).
+test('zone name edit updates the tile label and Zone Detail header, and persists across reload', async ({
+  page,
+}) => {
+  await mockController(page);
+  await page.goto('/index.html');
+
+  await page.locator('[data-zone-open="2"]').click();
+  await expect(page.locator('#zone-view-name')).toHaveText('TK BEDROOM'); // default name, sanity check
+
+  const nameInput = page.locator('[data-zone-name-input]');
+  await nameInput.fill('Kids Room');
+  await nameInput.dispatchEvent('input');
+
+  await expect(page.locator('[data-zone-title-name="2"]')).toHaveText('Kids Room');
+  await expect(page.locator('#zone-view-name')).toHaveText('Kids Room');
+
+  await page.reload();
+  // The dashboard tile alone (renderZones() reads loadZoneNames() on load)
+  // proves the localStorage write survived, independent of reopening detail.
+  await expect(page.locator('[data-zone-title-name="2"]')).toHaveText('Kids Room');
+  await page.locator('[data-zone-open="2"]').click();
+  await expect(page.locator('#zone-view-name')).toHaveText('Kids Room');
+});
+
+// TEA-0003 (HIGH), second half: manual actual-temp entry
+// ([data-zone-actualtemp-input], index.html ~line 711, wired ~line 1079) had
+// zero test coverage. Asserts the entry saves to localStorage ('zoneTemps')
+// and propagates to both the dashboard tile badge and the Zone Detail
+// "Actual temp" stat, then survives a reload.
+//
+// Zone 1's mocked getZoneData always includes a real (non-empty) actualTemp,
+// and applyZoneState() (index.html ~line 1396) unconditionally calls
+// saveZoneTemp(z, actualTemp) on every SUCCESSFUL refresh, live-poll or not
+// -- unlike the temp/percent/setting fields, this one has no focus or
+// grace-window guard on the localStorage write. That's real, correct
+// behavior (the field exists for when the live poll can't reach the unit --
+// see its label, "paste <actualTemp> ... 0.0 usually = no sensor"), but it
+// means a live refresh landing after this test typed its own value would
+// immediately overwrite it with the controller's reading, including on the
+// reload below. Aborting zone 1's getZoneData for the rest of this test
+// (registered after mockController's own route, so it's tried first --
+// same pattern as "a failed command clears its pending state instead of
+// hanging" above) makes every refresh for zone 1 fail closed instead,
+// isolating the assertion to what this feature itself is responsible for.
+test('manual actual-temp entry saves, displays, and persists across a reload that cannot reach the unit', async ({
+  page,
+}) => {
+  await mockController(page);
+  await page.route('**/proxy/getZoneData?zone=1**', (route) => route.abort('failed'));
+  await page.goto('/index.html');
+
+  await page.locator('[data-zone-open="1"]').click();
+  const actualTempInput = page.locator('[data-zone-actualtemp-input]');
+  await actualTempInput.fill('19.5');
+  await actualTempInput.dispatchEvent('input');
+
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('zoneTemps') || '{}'));
+  expect(stored['1'].value).toBe('19.5');
+
+  await expect(page.locator('[data-zone-title-temp="1"]')).toHaveText('19.5°C');
+  await expect(page.locator('#zone-actual-temp-display')).toHaveText('19.5°C');
+
+  await page.reload();
+  await page.locator('[data-zone-open="1"]').click();
+
+  await expect(page.locator('[data-zone-actualtemp-input]')).toHaveValue('19.5');
+  await expect(page.locator('[data-zone-title-temp="1"]')).toHaveText('19.5°C');
+  await expect(page.locator('#zone-actual-temp-display')).toHaveText('19.5°C');
+});
+
+// Test Effectiveness Audit (final report), HIGH: refreshState()'s
+// Promise.allSettled() over every zone (index.html ~1446-1462) had no test
+// covering the case where SOME zones succeed and others fail -- every
+// existing failure test (e.g. "a failed command clears its pending state
+// instead of hanging" and the getZoneData?zone=1 abort above) either fails
+// a single command's own request or aborts a single zone this test isn't
+// looking at, never exercises a MIXED read result across zones in the same
+// refreshState() pass. updateStatusLine()'s okCount > 0 && lastError branch
+// (index.html ~1415-1417) is the dedicated UI for exactly this case --
+// #live-dot gets the 'partial' class/title and the status caption reads
+// "Partially reflecting live state (some requests failed) — ...". This
+// asserts both, driven by a real mixed-result refreshState() run (zone 2's
+// getZoneData aborted, getSystemData/zone 1/zone 3 succeed normally), not a
+// reimplementation of updateStatusLine()'s branching logic.
+test('a partial per-zone read failure shows the "partial" live-dot and status text, not the plain success or full-error state', async ({
+  page,
+}) => {
+  await mockController(page);
+  // Only zone 2 fails; getSystemData and zones 1/3 (the default 3-zone
+  // fixture) succeed normally -- a genuinely mixed result.
+  await page.route('**/proxy/getZoneData?zone=2**', (route) => route.abort('failed'));
+  await page.goto('/index.html');
+
+  const dot = page.locator('#live-dot');
+  const statusEl = page.locator('#live-poll-status');
+
+  // Not the all-succeeded 'ok' state...
+  await expect(dot).toHaveClass(/partial/, { timeout: 3000 });
+  await expect(dot).not.toHaveClass(/\bok\b/);
+  // ...and not the all-failed 'error' state either -- some zones plus the
+  // system read genuinely succeeded.
+  await expect(dot).not.toHaveClass(/\berror\b/);
+  await expect(dot).toHaveAttribute('title', 'Partially connected: some requests failed');
+
+  await expect(statusEl).toContainText('Partially reflecting live state (some requests failed)');
 });
