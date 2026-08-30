@@ -58,10 +58,11 @@ if (files.length === 0) {
 // ranges are applied largest-to-smallest and let smaller ones overwrite.
 function applyEntryCoverage(entry, coveredOut) {
   const allRanges = entry.functions.flatMap((fn) => fn.ranges);
-  allRanges.sort((a, b) => (b.endOffset - b.startOffset) - (a.endOffset - a.startOffset));
+  allRanges.sort((a, b) => b.endOffset - b.startOffset - (a.endOffset - a.startOffset));
   for (const range of allRanges) {
     const hit = range.count > 0;
-    for (let i = range.startOffset; i < range.endOffset && i < coveredOut.length; i++) coveredOut[i] = hit;
+    for (let i = range.startOffset; i < range.endOffset && i < coveredOut.length; i++)
+      coveredOut[i] = hit;
   }
 }
 
@@ -77,7 +78,10 @@ for (const file of files) {
     applyEntryCoverage(entry, perRun);
 
     if (!merged.has(entry.url)) {
-      merged.set(entry.url, { text: entry.source, covered: new Array(entry.source.length).fill(false) });
+      merged.set(entry.url, {
+        text: entry.source,
+        covered: new Array(entry.source.length).fill(false),
+      });
     }
     const m = merged.get(entry.url);
     for (let i = 0; i < perRun.length; i++) {
@@ -87,7 +91,9 @@ for (const file of files) {
 }
 
 if (merged.size === 0) {
-  console.error("✖ No coverage entries matched index.html's inline script — fixture or filter is broken.");
+  console.error(
+    "✖ No coverage entries matched index.html's inline script — fixture or filter is broken.",
+  );
   process.exit(1);
 }
 
@@ -99,7 +105,9 @@ for (const { covered } of merged.values()) {
 }
 
 const pct = (coveredBytes / totalBytes) * 100;
-console.log(`JS execution coverage (E2E suite, ${files.length} tests): ${pct.toFixed(1)}% (${coveredBytes}/${totalBytes} bytes)`);
+console.log(
+  `JS execution coverage (E2E suite, ${files.length} tests): ${pct.toFixed(1)}% (${coveredBytes}/${totalBytes} bytes)`,
+);
 
 if (pct < FLOOR) {
   console.error(`✖ Below floor of ${FLOOR}%`);

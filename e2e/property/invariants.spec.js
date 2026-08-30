@@ -76,7 +76,10 @@ test.describe('property: zone desired-temp stepper stays in range', () => {
   // the real DOM, not a reimplementation of the clamp math.
   test('any sequence of +/- taps keeps zone desired temp within [16, 30]', async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('connSettings', JSON.stringify({ ip: '192.168.1.192', port: '2025', password: 'password', zones: '3' }));
+      localStorage.setItem(
+        'connSettings',
+        JSON.stringify({ ip: '192.168.1.192', port: '2025', password: 'password', zones: '3' }),
+      );
     });
     await page.goto('/index.html');
     // Open Zone Detail for zone 1 so the shared dial-edge stepper buttons
@@ -116,9 +119,14 @@ test.describe('property: damper percentage invariant', () => {
   // haven't drifted), and that the app's own percent-display readout
   // (`percentDisplay.textContent = percentInput.value + '%'`, index.html
   // ~line 1288) never surfaces a value outside that range to the user.
-  test('damper percent input and its display readout stay within [0, 100] for any assigned value', async ({ page }) => {
+  test('damper percent input and its display readout stay within [0, 100] for any assigned value', async ({
+    page,
+  }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('connSettings', JSON.stringify({ ip: '192.168.1.192', port: '2025', password: 'password', zones: '3' }));
+      localStorage.setItem(
+        'connSettings',
+        JSON.stringify({ ip: '192.168.1.192', port: '2025', password: 'password', zones: '3' }),
+      );
     });
     await page.goto('/index.html');
     await page.evaluate(() => window.openZoneDetail && window.openZoneDetail('1'));

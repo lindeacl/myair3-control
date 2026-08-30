@@ -4,12 +4,15 @@
   "type": "module",
   "scripts": {
     "test:e2e": "playwright test",
-    "test:mutation": "stryker run"
+    "test:mutation": "stryker run",
+    "format": "prettier --write \"**/*.{js,mjs}\"",
+    "format:check": "prettier --check \"**/*.{js,mjs}\""
   },
   "devDependencies": {
     "@playwright/test": "^1.48.0",
     "@stryker-mutator/core": "^10.0.0",
     "fast-check": "^4.9.0",
-    "http-server": "^14.1.1"
+    "http-server": "^14.1.1",
+    "prettier": "^3.9.6"
   }
 }

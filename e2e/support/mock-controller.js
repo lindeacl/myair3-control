@@ -8,7 +8,10 @@
 // true -- needed to test the native-only code paths (raw-output fetch),
 // which otherwise never execute under Playwright since isNative() is
 // normally always false in a plain browser.
-export async function mockController(page, { staleGetSystemData = false, delayMs = 0, nativeBase = null } = {}) {
+export async function mockController(
+  page,
+  { staleGetSystemData = false, delayMs = 0, nativeBase = null } = {},
+) {
   const state = {
     airconOnOff: '0',
     mode: '1',
@@ -43,7 +46,8 @@ export async function mockController(page, { staleGetSystemData = false, delayMs
       if (params.has('airconOnOff')) state.airconOnOff = params.get('airconOnOff');
       if (params.has('mode')) state.mode = params.get('mode');
       if (params.has('fanSpeed')) state.fanSpeed = params.get('fanSpeed');
-      if (params.has('centralDesiredTemp')) state.centralDesiredTemp = params.get('centralDesiredTemp');
+      if (params.has('centralDesiredTemp'))
+        state.centralDesiredTemp = params.get('centralDesiredTemp');
       return { contentType: 'application/xml', body: '<ack>1</ack>' };
     }
     if (path === '/getZoneData') {
@@ -54,7 +58,12 @@ export async function mockController(page, { staleGetSystemData = false, delayMs
       // fails the whole route handler, which surfaces as a hard Playwright
       // test failure rather than the ordinary failed-fetch a real unmocked
       // zone would produce.
-      const defaultZone = { setting: '0', userPercentSetting: '80', desiredTemp: '22', actualTemp: '20' };
+      const defaultZone = {
+        setting: '0',
+        userPercentSetting: '80',
+        desiredTemp: '22',
+        actualTemp: '20',
+      };
       const zs = (staleGetSystemData ? staleSnapshot.zones[z] : state.zones[z]) || defaultZone;
       return {
         contentType: 'application/xml',
@@ -66,7 +75,8 @@ export async function mockController(page, { staleGetSystemData = false, delayMs
       const zs = state.zones[z];
       if (params.has('zoneSetting')) zs.setting = params.get('zoneSetting');
       if (params.has('desiredTemp')) zs.desiredTemp = params.get('desiredTemp');
-      if (params.has('userPercentSetting')) zs.userPercentSetting = params.get('userPercentSetting');
+      if (params.has('userPercentSetting'))
+        zs.userPercentSetting = params.get('userPercentSetting');
       return { contentType: 'application/xml', body: '<ack>1</ack>' };
     }
     return { status: 404, body: 'not mocked' };
