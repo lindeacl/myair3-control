@@ -1,0 +1,24 @@
+# Generated/ignored (mirrors .gitignore -- nothing here is source to format)
+node_modules/
+test-results/
+playwright-report/
+playwright/.cache/
+coverage-raw/
+.stryker-tmp/
+reports/
+package-lock.json
+
+# package.json's format/format:check scripts already scope to **/*.{js,mjs},
+# so index.html (a .html file whose logic happens to live in an inline
+# <script>) is never matched by that glob -- this entry is belt-and-suspenders
+# documentation of WHY, in case the scripts' glob is ever loosened to "."
+# later: prettier's HTML formatter reformats the entire file (re-indents
+# <head>, expands hand-written single-line CSS rules in the <style> block
+# onto multiple lines, converts self-closing tag style, etc.) -- verified by
+# actually running `prettier --write` against a scratch copy: a ~4,300-line
+# diff on a 1,660-line file. Forcing that through would swamp and mask real
+# code changes under near-total whitespace/tag-style churn -- exactly the
+# risk docs/CODE_STANDARDS.md's own "ratchet, not a rewrite" reasoning (see
+# QUALITY_STANDARD.md §8) warns against. Formatting index.html is a real,
+# worthwhile follow-up -- just as its own clearly-isolated, reviewable change.
+index.html
