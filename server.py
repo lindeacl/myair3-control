@@ -15,6 +15,7 @@ Then, on a phone on the same WiFi, open http://<this-machine's-LAN-IP>:8080/
 """
 import argparse
 import http.server
+import ipaddress
 import os
 import socket
 import socketserver
@@ -23,6 +24,30 @@ import urllib.request
 from urllib.parse import parse_qsl, urlencode, urlsplit
 
 PWA_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Trust model for this whole file, stated explicitly rather than left
+# implicit: this is a local dev/LAN tool for one trusted user controlling
+# their own aircon unit on their own home network -- not internet-facing,
+# no auth, no multi-tenant concerns. proxy_request() below forwards to
+# whatever _ip/_port the page supplies (the Settings screen writes these),
+# so it IS functionally an open relay within that trust boundary -- the
+# validation added here is a basic sanity/typo check (reject obviously
+# malformed input with a clear error), not a security boundary. Don't
+# over-engineer this into an allowlist/auth system; that would fight the
+# "single trusted user on their own LAN" model this app is built for.
+def _is_valid_target_ip(value):
+    try:
+        ipaddress.IPv4Address(value)
+        return True
+    except ValueError:
+        return False
+
+
+def _is_valid_target_port(value):
+    try:
+        return 1 <= int(value) <= 65535
+    except (TypeError, ValueError):
+        return False
 
 
 def build_handler(default_ip, default_port):
@@ -48,6 +73,19 @@ def build_handler(default_ip, default_port):
                     port = value
                 else:
                     forward_pairs.append((key, value))
+
+            if not _is_valid_target_ip(ip) or not _is_valid_target_port(port):
+                message = (
+                    f'Rejected proxy target ip={ip!r} port={port!r}: '
+                    'expected a dotted-quad IPv4 address and a port in 1-65535.'
+                )
+                body = message.encode('utf-8')
+                self.send_response(400)
+                self.send_header('Content-Type', 'text/plain; charset=utf-8')
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
 
             target_path = split.path[len('/proxy'):]  # keeps leading '/'
             forward_query = urlencode(forward_pairs)
