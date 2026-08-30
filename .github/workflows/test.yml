@@ -47,6 +47,14 @@ jobs:
       - name: Secret scan (gitleaks)
         uses: gitleaks/gitleaks-action@v2
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # gitleaks-action now requires GITHUB_TOKEN for pull_request-event
+          # scans (an upstream breaking change) — without it every PR's
+          # "test" check fails here unconditionally. This was previously
+          # masked: PR #14's pull_request-triggered run never reached this
+          # step at all, because it died earlier at the diff-size check
+          # (the trigger-duplication bug fixed above) — found live when
+          # fixing that bug exposed this one, on PR #15's own CI run.
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
         # Server-side backstop for the same check the local pre-commit hook
         # runs (.husky/pre-commit) — that one soft-fails when gitleaks isn't
