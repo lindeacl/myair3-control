@@ -61,9 +61,17 @@ Stack:
                      design). Mechanical equivalent: scripts/check-html-js.mjs
                      (parses every embedded <script> block, checks for
                      duplicate static ids)
-  Formatter:        None installed (no prettier/equivalent) — a known,
-                     documented gap; agent-governance-kit.md's own install
-                     output recommends adding `prettier --check` to CI
+  Formatter:        prettier (`.prettierrc.json`: 2-space indent, single
+                     quotes — matches this project's existing JS style),
+                     wired into `.husky/pre-commit` and CI
+                     (`npm run format:check`). Scoped to `**/*.{js,mjs}`
+                     only — `index.html` is deliberately excluded for now
+                     (see `.prettierignore`): prettier's HTML formatter
+                     reformats the whole file (~4,300-line diff on this
+                     1,660-line file, measured by actually running it),
+                     which would swamp real changes under whitespace
+                     churn. Formatting index.html is a real follow-up, just
+                     not bundled into unrelated changes.
   Package manager:  npm (package-lock.json committed)
   Monorepo?         No — single package.json at repo root (a sibling
                      ../ios-app Capacitor wrapper exists outside this repo
@@ -190,6 +198,28 @@ Team size:
       supports it — no untyped/`any`-equivalent escape hatches by default
 - [ ] Event handlers prefixed: handleSubmit / handleClick / onClose
       (frontend-specific — skip for a backend-only project)
+      **[ EDIT NOTE for this project]: NOT the actual convention here —
+      see below.**
+
+**This project's real convention, documented instead of left in
+disagreement with the code:** `index.html` consistently uses anonymous
+inline arrow-function listeners for simple, one-off UI wiring (15+ call
+sites — `document.getElementById('settings-open').addEventListener('click',
+() => {...})`, the `.cmd`/`.data` delegated click handlers, the
+`live-poll-toggle` change handler, etc.), not named `handleX`/`onX`
+functions. This is a deliberate, internally-consistent house style, not an
+oversight — refactoring 15+ call sites into named handlers for a project
+this size would be churn/risk with no real readability gain (each listener
+is a few lines, attached once, next to the element it wires). Multi-step or
+reused logic already IS a named function regardless of whether it's wired
+as a listener (`refreshState`, `sendCommand`, `openZoneDetail`,
+`handleCommandSuccess`, `handleCommandFailure`, etc.) — the
+anonymous-inline pattern is specifically for simple, single-purpose
+listener bodies. Leaving the checklist item above stating the opposite of
+actual practice would be exactly the "unenforced/wrong rule is worse than
+an honest one" failure this file warns against elsewhere (see §1.3's
+grandfathered file-size ratchet for the same reasoning applied to a
+different rule).
 
 ### 2.3 Constants & Enums
 
