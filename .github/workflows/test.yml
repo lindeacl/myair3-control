@@ -2,7 +2,18 @@ name: Test
 
 on:
   push:
-    branches: ['**']
+    # branches: [main] only — NOT '**'. A wildcard here creates a second,
+    # differently-gated "test" check-run on the same commit SHA as any PR
+    # from that branch (the push-triggered run skips the diff-size step,
+    # which only runs `if: github.event_name == 'pull_request'`), and
+    # GitHub's required-status-check matching is by NAME only, not by
+    # trigger — so a passing push-triggered "test" run can satisfy branch
+    # protection even when the pull_request-triggered "test" run (carrying
+    # the real gate) genuinely failed. Verified this exact defect let a
+    # 5,955-line PR merge past the documented 1,000-line hard block
+    # (STANDARDS_AUDIT.md run 2026-08-29, cross-checked live via
+    # `gh api .../check-runs` against the real check-runs on that commit).
+    branches: [main]
     tags: ['v*']
   pull_request:
   schedule:
@@ -36,6 +47,14 @@ jobs:
       - name: Secret scan (gitleaks)
         uses: gitleaks/gitleaks-action@v2
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # gitleaks-action now requires GITHUB_TOKEN for pull_request-event
+          # scans (an upstream breaking change) — without it every PR's
+          # "test" check fails here unconditionally. This was previously
+          # masked: PR #14's pull_request-triggered run never reached this
+          # step at all, because it died earlier at the diff-size check
+          # (the trigger-duplication bug fixed above) — found live when
+          # fixing that bug exposed this one, on PR #15's own CI run.
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
         # Server-side backstop for the same check the local pre-commit hook
         # runs (.husky/pre-commit) — that one soft-fails when gitleaks isn't
