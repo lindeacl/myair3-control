@@ -6,7 +6,10 @@ import { mockController } from './support/mock-controller.js';
 // a value survives, so it seeds manually instead of via this shared hook.
 async function seedConnSettings(page) {
   await page.addInitScript(() => {
-    localStorage.setItem('connSettings', JSON.stringify({ ip: '192.168.1.192', port: '2025', password: 'password', zones: '3' }));
+    localStorage.setItem(
+      'connSettings',
+      JSON.stringify({ ip: '192.168.1.192', port: '2025', password: 'password', zones: '3' }),
+    );
   });
 }
 
@@ -24,7 +27,9 @@ test('zones render on load', async ({ page }) => {
 // against (375px -- the default Playwright viewport is 1280x720 and would
 // not have caught either the original scroll strip or the truncation
 // regression this fix also had to correct along the way).
-test('zone row fills the width evenly with no horizontal scroll at mobile width', async ({ page }) => {
+test('zone row fills the width evenly with no horizontal scroll at mobile width', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await seedConnSettings(page);
   await mockController(page);
@@ -41,9 +46,9 @@ test('zone row fills the width evenly with no horizontal scroll at mobile width'
   // Each tile's full name must be visible (not clipped by an ellipsis or
   // any other overflow:hidden truncation) -- this is what the earlier
   // white-space:nowrap + text-overflow:ellipsis regression broke.
-  const nameOverflows = await container.locator('.zone-tile-name').evaluateAll(
-    (nodes) => nodes.map((n) => n.scrollWidth - n.clientWidth)
-  );
+  const nameOverflows = await container
+    .locator('.zone-tile-name')
+    .evaluateAll((nodes) => nodes.map((n) => n.scrollWidth - n.clientWidth));
   for (const delta of nameOverflows) {
     expect(delta).toBeLessThanOrEqual(1);
   }
@@ -67,7 +72,12 @@ test('zone On/Off sends silently and does not navigate away', async ({ page }) =
   const startUrl = page.url();
   const onLink = page.locator('[data-zone-on="2"]');
 
-  const requestPromise = page.waitForRequest((req) => req.url().includes('/setZoneData') && req.url().includes('zone=2') && req.url().includes('zoneSetting=1'));
+  const requestPromise = page.waitForRequest(
+    (req) =>
+      req.url().includes('/setZoneData') &&
+      req.url().includes('zone=2') &&
+      req.url().includes('zoneSetting=1'),
+  );
   await onLink.click();
   await requestPromise;
 
@@ -82,7 +92,12 @@ test('zone Off pill also sends silently and does not navigate', async ({ page })
   await page.goto('/index.html');
   const startUrl = page.url();
   const offLink = page.locator('[data-zone-off="1"]');
-  const requestPromise = page.waitForRequest((req) => req.url().includes('/setZoneData') && req.url().includes('zone=1') && req.url().includes('zoneSetting=0'));
+  const requestPromise = page.waitForRequest(
+    (req) =>
+      req.url().includes('/setZoneData') &&
+      req.url().includes('zone=1') &&
+      req.url().includes('zoneSetting=0'),
+  );
   await offLink.click();
   await requestPromise;
   expect(page.url()).toBe(startUrl);
@@ -96,7 +111,9 @@ test('zone Off pill also sends silently and does not navigate', async ({ page })
 // prompted tapping again. delayMs simulates a slow controller; the active
 // class must appear well before that delay elapses, proving it's applied
 // optimistically on tap rather than waiting for the network round-trip.
-test('toggle buttons show selected immediately on tap, not after the full confirm round-trip', async ({ page }) => {
+test('toggle buttons show selected immediately on tap, not after the full confirm round-trip', async ({
+  page,
+}) => {
   await mockController(page, { delayMs: 3000 });
   await page.goto('/index.html');
   const onLink = page.locator('[data-zone-on="2"]');
@@ -108,7 +125,9 @@ test('power On/Off command buttons send silently, not via raw navigation', async
   await mockController(page);
   await page.goto('/index.html');
   const startUrl = page.url();
-  const requestPromise = page.waitForRequest((req) => req.url().includes('/setSystemData') && req.url().includes('airconOnOff=1'));
+  const requestPromise = page.waitForRequest(
+    (req) => req.url().includes('/setSystemData') && req.url().includes('airconOnOff=1'),
+  );
   await page.locator('#link-on').click();
   await requestPromise;
   expect(page.url()).toBe(startUrl);
@@ -121,7 +140,9 @@ test('power On/Off command buttons send silently, not via raw navigation', async
 // stale value and clobber whatever was just typed. staleGetSystemData:true
 // simulates a unit that never catches up within the test's timeframe, so if
 // the grace-window protection didn't exist, the field would visibly revert.
-test('central temp field holds the value you just set even if a refresh reads stale state', async ({ page }) => {
+test('central temp field holds the value you just set even if a refresh reads stale state', async ({
+  page,
+}) => {
   await mockController(page, { staleGetSystemData: true });
   await page.goto('/index.html');
 
@@ -129,7 +150,9 @@ test('central temp field holds the value you just set even if a refresh reads st
   await tempInput.fill('24.5');
   await tempInput.dispatchEvent('input');
 
-  const requestPromise = page.waitForRequest((req) => req.url().includes('/setSystemData') && req.url().includes('centralDesiredTemp=24.5'));
+  const requestPromise = page.waitForRequest(
+    (req) => req.url().includes('/setSystemData') && req.url().includes('centralDesiredTemp=24.5'),
+  );
   await page.locator('#link-temp').click();
   await requestPromise;
 
@@ -151,7 +174,9 @@ test('power On button stays selected even if a refresh reads stale state', async
   await page.goto('/index.html');
 
   const onLink = page.locator('#link-on');
-  const requestPromise = page.waitForRequest((req) => req.url().includes('/setSystemData') && req.url().includes('airconOnOff=1'));
+  const requestPromise = page.waitForRequest(
+    (req) => req.url().includes('/setSystemData') && req.url().includes('airconOnOff=1'),
+  );
   await onLink.click();
   await requestPromise;
 
@@ -169,7 +194,9 @@ test('power On button stays selected even if a refresh reads stale state', async
 // airconOnOff response instead of link-on's already-protected classList, so
 // it could show "Unit is OFF" while the Power button right above it
 // correctly still showed ON.
-test('the "Unit is ON/OFF" caption matches the Power button even if a refresh reads stale state', async ({ page }) => {
+test('the "Unit is ON/OFF" caption matches the Power button even if a refresh reads stale state', async ({
+  page,
+}) => {
   await mockController(page, { staleGetSystemData: true });
   await page.goto('/index.html');
 
@@ -177,7 +204,9 @@ test('the "Unit is ON/OFF" caption matches the Power button even if a refresh re
   await expect(note).toContainText('Unit is OFF'); // load-time refresh reflects the unit: off
 
   const onLink = page.locator('#link-on');
-  const requestPromise = page.waitForRequest((req) => req.url().includes('/setSystemData') && req.url().includes('airconOnOff=1'));
+  const requestPromise = page.waitForRequest(
+    (req) => req.url().includes('/setSystemData') && req.url().includes('airconOnOff=1'),
+  );
   await onLink.click();
   await requestPromise;
 
@@ -199,7 +228,12 @@ test('zone On button stays selected even if a refresh reads stale state', async 
   await page.goto('/index.html');
 
   const onLink = page.locator('[data-zone-on="2"]');
-  const requestPromise = page.waitForRequest((req) => req.url().includes('/setZoneData') && req.url().includes('zone=2') && req.url().includes('zoneSetting=1'));
+  const requestPromise = page.waitForRequest(
+    (req) =>
+      req.url().includes('/setZoneData') &&
+      req.url().includes('zone=2') &&
+      req.url().includes('zoneSetting=1'),
+  );
   await onLink.click();
   await requestPromise;
 
@@ -213,7 +247,9 @@ test('zone On button stays selected even if a refresh reads stale state', async 
 // headline display next to it was painted straight from the stale response
 // and snapped back to 22.0 -- a half-reverted UI that reads as "didn't take"
 // exactly like the button reverting did.
-test('the big central temp display holds the value you just set, matching its input', async ({ page }) => {
+test('the big central temp display holds the value you just set, matching its input', async ({
+  page,
+}) => {
   await mockController(page, { staleGetSystemData: true });
   await page.goto('/index.html');
 
@@ -221,7 +257,9 @@ test('the big central temp display holds the value you just set, matching its in
   await tempInput.fill('24.5');
   await tempInput.dispatchEvent('input');
 
-  const requestPromise = page.waitForRequest((req) => req.url().includes('/setSystemData') && req.url().includes('centralDesiredTemp=24.5'));
+  const requestPromise = page.waitForRequest(
+    (req) => req.url().includes('/setSystemData') && req.url().includes('centralDesiredTemp=24.5'),
+  );
   await page.locator('#link-temp').click();
   await requestPromise;
 
@@ -235,7 +273,9 @@ test('the big central temp display holds the value you just set, matching its in
 // the zone's temp/damper command URLs. A stale refresh flipping it back
 // therefore changes what the NEXT tap of the same ✓ sends, silently turning
 // the zone off after you deliberately set it on.
-test("a zone's on/off select holds the setting its command just sent even if a refresh reads stale state", async ({ page }) => {
+test("a zone's on/off select holds the setting its command just sent even if a refresh reads stale state", async ({
+  page,
+}) => {
   await mockController(page, { staleGetSystemData: true });
   await page.goto('/index.html');
 
@@ -245,7 +285,12 @@ test("a zone's on/off select holds the setting its command just sent even if a r
   await expect(settingSelect).toHaveValue('0'); // load-time refresh reflects the unit: zone 2 is off
 
   await settingSelect.selectOption('1');
-  const requestPromise = page.waitForRequest((req) => req.url().includes('/setZoneData') && req.url().includes('zone=2') && req.url().includes('zoneSetting=1'));
+  const requestPromise = page.waitForRequest(
+    (req) =>
+      req.url().includes('/setZoneData') &&
+      req.url().includes('zone=2') &&
+      req.url().includes('zoneSetting=1'),
+  );
   await page.locator('[data-zone-temp-link="2"]').click();
   await requestPromise;
 
@@ -261,7 +306,9 @@ test("a zone's on/off select holds the setting its command just sent even if a r
 // check, so it can snap back to "Off" while the select underneath still
 // correctly reads "On" -- the same "didn't take" symptom in a different
 // element, same class as central-temp-display / zone-percent-display-val.
-test("the zone detail 'Zone state' stat card holds the setting its command just sent even if a refresh reads stale state", async ({ page }) => {
+test("the zone detail 'Zone state' stat card holds the setting its command just sent even if a refresh reads stale state", async ({
+  page,
+}) => {
   await mockController(page, { staleGetSystemData: true });
   await page.goto('/index.html');
 
@@ -272,7 +319,12 @@ test("the zone detail 'Zone state' stat card holds the setting its command just 
   await page.locator('.advanced-summary').click(); // the setting select lives under the collapsed Advanced disclosure
   const settingSelect = page.locator('[data-zone-setting="2"]');
   await settingSelect.selectOption('1');
-  const requestPromise = page.waitForRequest((req) => req.url().includes('/setZoneData') && req.url().includes('zone=2') && req.url().includes('zoneSetting=1'));
+  const requestPromise = page.waitForRequest(
+    (req) =>
+      req.url().includes('/setZoneData') &&
+      req.url().includes('zone=2') &&
+      req.url().includes('zoneSetting=1'),
+  );
   await page.locator('[data-zone-temp-link="2"]').click();
   await requestPromise;
 
@@ -285,7 +337,9 @@ test("the zone detail 'Zone state' stat card holds the setting its command just 
 // optimistic highlight for a few seconds. When the send is known to have
 // FAILED, though, that highlight is known-wrong, and holding the window
 // would make the one case we're certain about the one case nothing may fix.
-test('a failed command releases its grace window so the next refresh corrects the highlight', async ({ page }) => {
+test('a failed command releases its grace window so the next refresh corrects the highlight', async ({
+  page,
+}) => {
   await page.addInitScript(() => {
     window.open = () => null; // swallow the web fallback's popup; not what this test is about
   });
@@ -356,7 +410,9 @@ test('returning from settings re-reads system state', async ({ page }) => {
   await page.goto('/index.html');
   await page.locator('#settings-open').click();
 
-  const refreshed = page.waitForRequest((req) => req.url().includes('/getSystemData'), { timeout: 3000 });
+  const refreshed = page.waitForRequest((req) => req.url().includes('/getSystemData'), {
+    timeout: 3000,
+  });
   await page.locator('#settings-close').click();
   await refreshed;
 });
@@ -400,7 +456,9 @@ test('zone detail Advanced controls are collapsed by default', async ({ page }) 
 // Same regression class as the Settings/native-only sheet-leak checks: the
 // sheet is a page-level overlay outside every view container, so nothing
 // hides it automatically when Zone Detail's back button changes the view.
-test('opening a zone does not leak the raw-output sheet across the transition', async ({ page }) => {
+test('opening a zone does not leak the raw-output sheet across the transition', async ({
+  page,
+}) => {
   const nativeBase = 'http://192.168.1.192:2025';
   await page.addInitScript(() => {
     window.Capacitor = {
@@ -424,7 +482,9 @@ test('opening a zone does not leak the raw-output sheet across the transition', 
 test('mode buttons (Cool/Heat/Fan) send silently and show selected', async ({ page }) => {
   await mockController(page);
   await page.goto('/index.html');
-  const requestPromise = page.waitForRequest((req) => req.url().includes('/setSystemData') && req.url().includes('mode=2'));
+  const requestPromise = page.waitForRequest(
+    (req) => req.url().includes('/setSystemData') && req.url().includes('mode=2'),
+  );
   await page.locator('#link-mode-2').click();
   await requestPromise;
   await expect(page.locator('#link-mode-2')).toHaveClass(/active/, { timeout: 3000 });
@@ -437,11 +497,15 @@ test('fan speed set and Auto both send the correct value', async ({ page }) => {
   const fanInput = page.locator('#fanSpeed');
   await fanInput.fill('3');
   await fanInput.dispatchEvent('input');
-  const setPromise = page.waitForRequest((req) => req.url().includes('/setSystemData') && req.url().includes('fanSpeed=3'));
+  const setPromise = page.waitForRequest(
+    (req) => req.url().includes('/setSystemData') && req.url().includes('fanSpeed=3'),
+  );
   await page.locator('#link-fan').click();
   await setPromise;
 
-  const autoPromise = page.waitForRequest((req) => req.url().includes('/setSystemData') && req.url().includes('fanSpeed=auto'));
+  const autoPromise = page.waitForRequest(
+    (req) => req.url().includes('/setSystemData') && req.url().includes('fanSpeed=auto'),
+  );
   await page.locator('#link-fan-auto').click();
   await autoPromise;
 });
@@ -469,7 +533,9 @@ test('a failed command clears its pending state instead of hanging', async ({ pa
 // direct-to-controller instead of through /proxy -- never executed in this
 // suite at all. Faking window.Capacitor before the page loads exercises that
 // code path for real, including that it fetches the DIRECT (non-proxy) URL.
-test('native-only: Get System Data shows raw XML inline instead of navigating', async ({ page }) => {
+test('native-only: Get System Data shows raw XML inline instead of navigating', async ({
+  page,
+}) => {
   const nativeBase = 'http://192.168.1.192:2025';
   await page.addInitScript(() => {
     window.Capacitor = {
@@ -542,10 +608,15 @@ test('dial +/- buttons are clickable and not obscured by .dial-center', async ({
 // #zones setting to 16 (the field's own max) to reproduce the width this
 // bug actually needs. Verified fail-before/pass-after by temporarily setting
 // .zone-tile's min-width to 0.
-test('zone tile icons never spill past their own tile into the next one at high zone counts', async ({ page }) => {
+test('zone tile icons never spill past their own tile into the next one at high zone counts', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.addInitScript(() => {
-    localStorage.setItem('connSettings', JSON.stringify({ ip: '192.168.1.192', port: '2025', password: 'password', zones: '16' }));
+    localStorage.setItem(
+      'connSettings',
+      JSON.stringify({ ip: '192.168.1.192', port: '2025', password: 'password', zones: '16' }),
+    );
   });
   await mockController(page);
   await page.goto('/index.html');
@@ -579,7 +650,9 @@ test('zone tile icons never spill past their own tile into the next one at high 
 // transparent instead of the intended default, leaving the icon looking
 // broken instead of merely un-tinted. Verified fail-before/pass-after by
 // temporarily removing the `!Number.isNaN(...)` guard.
-test('a zone with a non-numeric desiredTemp does not corrupt the tile icon color', async ({ page }) => {
+test('a zone with a non-numeric desiredTemp does not corrupt the tile icon color', async ({
+  page,
+}) => {
   const state = await mockController(page);
   state.zones[1].desiredTemp = ''; // present-but-unparseable <desiredTemp>, as a malformed response might send
   // Set up the wait BEFORE navigating -- refreshState()'s initial read is
@@ -587,7 +660,9 @@ test('a zone with a non-numeric desiredTemp does not corrupt the tile icon color
   // assertions below could run before the mocked getZoneData response (and
   // the DOM writes that depend on it) has actually landed, making the test
   // pass even on a broken build purely by racing ahead of the bug.
-  const zone1Read = page.waitForResponse((res) => res.url().includes('/getZoneData') && res.url().includes('zone=1'));
+  const zone1Read = page.waitForResponse(
+    (res) => res.url().includes('/getZoneData') && res.url().includes('zone=1'),
+  );
   await page.goto('/index.html');
   await zone1Read;
 
