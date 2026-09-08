@@ -76,14 +76,20 @@
     max-width: 480px;
     margin: 0 auto;
     padding: 14px;
-    padding-top: calc(14px + env(safe-area-inset-top));
-    padding-bottom: calc(28px + env(safe-area-inset-bottom));
+    /* Static portion trimmed (was 14px/28px) so the three views still fit
+       one screen once a real device's safe-area insets (Dynamic Island ~59px
+       top, home indicator ~34px bottom -- env() reports 0 in every browser
+       devtools/preview, so this was verified by temporarily hard-coding
+       those values into a test stylesheet, per DEFECT_DISCIPLINE.md Rule 5)
+       are added on top, not just in the notch-free preview. */
+    padding-top: calc(10px + env(safe-area-inset-top));
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
     background: transparent;
     color: var(--text);
     -webkit-font-smoothing: antialiased;
   }
 
-  header { margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  header { margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -0.02em; }
   .sub { color: var(--muted); font-size: 12.5px; font-weight: 500; margin: 5px 0 0; }
 
@@ -260,7 +266,7 @@
   svg.i-sm { width: 16px; height: 16px; }
 
   /* ---- Power switch: compact two-pill, sits above each dial ---- */
-  .power-row { display: flex; justify-content: center; margin-bottom: 14px; }
+  .power-row { display: flex; justify-content: center; margin-bottom: 8px; }
   .switch-track {
     display: flex; gap: 4px; padding: 4px; width: 168px;
     background: rgba(255, 255, 255, 0.05);
@@ -284,7 +290,7 @@
   }
 
   /* ---- Dial (shared by the central control and Zone Detail) ---- */
-  .dial-wrap { position: relative; width: 252px; height: 252px; margin: 0 auto 14px; }
+  .dial-wrap { position: relative; width: 252px; height: 252px; margin: 0 auto 8px; }
   .dial-ring-svg { position: absolute; inset: 0; transform: rotate(-90deg); pointer-events: none; }
   /* Both the fill amount and the gradient color jump instantly without this
      -- a tap on +/- or a fresh refresh landing would otherwise snap the ring
@@ -310,7 +316,7 @@
   .dial-center .icon-btn { pointer-events: auto; }
   .dial-temp { font-size: 62px; font-weight: 250; letter-spacing: -0.045em; line-height: 1; font-variant-numeric: tabular-nums; }
   .dial-unit { font-size: 22px; color: var(--muted); font-weight: 500; letter-spacing: 0; }
-  .dial-caption { color: var(--faint); font-size: 11.5px; text-align: center; padding: 0 28px; line-height: 1.45; margin-bottom: 16px; }
+  .dial-caption { color: var(--faint); font-size: 11.5px; text-align: center; padding: 0 28px; line-height: 1.45; margin-bottom: 8px; }
   .dial-edge {
     position: absolute; top: 50%; transform: translateY(-50%);
     width: 44px; height: 44px; border-radius: 50%;
@@ -329,7 +335,7 @@
   /* ---- Mode row: one segmented glass strip instead of three loose circles,
      so the active mode reads as a switch position rather than a lit dot. ---- */
   .mode-row {
-    display: flex; gap: 4px; padding: 4px; margin: 0 0 14px;
+    display: flex; gap: 4px; padding: 4px; margin: 0 0 8px;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--border);
     box-shadow: var(--lip);
@@ -353,7 +359,7 @@
     display: flex; align-items: center; gap: 8px;
     background: linear-gradient(180deg, var(--card-2), var(--card));
     border: 1px solid var(--border); box-shadow: var(--lip);
-    border-radius: var(--r-md); padding: 11px 12px; margin-bottom: 8px;
+    border-radius: var(--r-md); padding: 11px 12px; margin-bottom: 6px;
   }
   .fan-strip .fan-label { color: var(--muted); font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; flex: 1 1 auto; min-width: 0; }
   .mini-step {
@@ -375,16 +381,20 @@
   a.auto-chip.active { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
 
   /* ---- Zone rows ---- */
-  .zones-title { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin: 0 0 10px; }
+  .zones-title { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin: 0 0 6px; }
   /* Rows, not tiles: a full-width row gives the zone name real room and gives
      the on/off switch a 44px-tall target instead of the ~26px pill it had
      inside a 90px-wide tile. flex-wrap is kept as the safety net it always
      was; min-width below is still the floor that makes wrapping fire before
      any hit-test overlap can happen if the zone count is ever raised far
      past what fits. */
-  .zone-scroll { display: flex; flex-direction: column; flex-wrap: wrap; gap: 8px; padding: 2px; margin-bottom: 14px; }
+  .zone-scroll { display: flex; flex-direction: column; flex-wrap: wrap; gap: 6px; padding: 2px; margin-bottom: 14px; }
   .zone-tile {
-    flex: 1 1 auto; min-width: 90px; border-radius: 18px; padding: 11px 13px;
+    /* Vertical padding trimmed 11px->8px (part of the fit-one-screen pass --
+       see the .stat-row comment below) -- kept generous enough that the
+       44px min-height .zone-tile-main tap target and the on/off pills'
+       own 44px min-height still fully clear this row's padding. */
+    flex: 1 1 auto; min-width: 90px; border-radius: 18px; padding: 8px 13px;
     background: linear-gradient(180deg, var(--card-2), var(--card));
     border: 1px solid var(--border);
     box-shadow: var(--lip);
@@ -437,7 +447,7 @@
   .back-row h1 { font-size: 19px; }
 
   /* ---- Stat cards (Zone Detail) ---- */
-  .stat-row { display: flex; gap: 10px; margin-bottom: 14px; }
+  .stat-row { display: flex; gap: 10px; margin-bottom: 8px; }
   .stat-card {
     flex: 1; background: linear-gradient(180deg, var(--card-2), var(--card));
     border: 1px solid var(--border); box-shadow: var(--lip);
@@ -550,7 +560,7 @@
      display:none the view-switching JS toggles directly) are NOT part of
      this -- those have to stay inline since JS computes/reads them. ---- */
   .mt-neg2 { margin-top: -2px; }
-  .mb-16 { margin-bottom: 16px; }
+  .mb-8 { margin-bottom: 8px; }
   .mt-12 { margin-top: 12px; }
   .mt-14 { margin-top: 14px; }
   .mb-14 { margin-bottom: 14px; }
@@ -654,7 +664,7 @@
   <a class="auto-chip cmd" id="link-fan-auto" href="#" target="_blank" rel="noopener">✨ Auto</a>
 </div>
 <input id="fanSpeed" type="number" min="1" max="4" value="2" class="visually-hidden-input" aria-label="Fan speed">
-<div class="note mt-neg2 mb-16">Auto sends <code>fanSpeed=auto</code>, unverified on this unit &mdash; check the raw XML if it doesn't take effect.</div>
+<div class="note mt-neg2 mb-8">Auto sends <code>fanSpeed=auto</code>, unverified on this unit &mdash; check the raw XML if it doesn't take effect.</div>
 
 <div>
   <div class="zones-title">Zones</div>
